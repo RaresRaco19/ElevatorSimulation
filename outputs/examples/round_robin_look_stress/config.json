@@ -1,0 +1,15 @@
+{
+  "scheduler": "round_robin",
+  "floors": 60,
+  "elevators": [
+    "E1",
+    "E2",
+    "E3",
+    "E4",
+    "E5",
+    "E6"
+  ],
+  "capacity": 8,
+  "input_file": "outputs/examples/round_robin_scan_stress/requests.csv",
+  "note": "car_policy=look"
+}

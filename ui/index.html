@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Elevator Simulation Playback</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="page-header">
+    <h1>Elevator Simulation Playback</h1>
+    <div class="header-right">
+      <div class="run-picker" id="run-picker">
+        <button type="button" id="run-picker-btn" class="run-picker-btn" aria-haspopup="listbox" aria-expanded="false">
+          <span id="run-picker-label">Loading…</span>
+          <span class="run-picker-caret" aria-hidden="true">▾</span>
+        </button>
+        <ul id="run-picker-list" class="run-picker-list" role="listbox" hidden></ul>
+      </div>
+      <div id="run-info" class="run-info">Loading run…</div>
+    </div>
+  </header>
+
+  <section class="summary-card" id="summary-card" hidden>
+    <h2>Run Summary</h2>
+    <div class="summary-grid">
+      <div class="stat-box stat-box--count">
+        <span class="stat-label">Passengers</span>
+        <span id="stat-count" class="stat-value">–</span>
+      </div>
+      <div class="stat-box stat-box--wait">
+        <span class="stat-label">Wait Time (min / avg / max)</span>
+        <span id="stat-wait" class="stat-value">–</span>
+      </div>
+      <div class="stat-box stat-box--total">
+        <span class="stat-label">Total Time (min / avg / max)</span>
+        <span id="stat-total" class="stat-value">–</span>
+      </div>
+    </div>
+  </section>
+
+  <section id="legend" class="legend" aria-label="Elevator selector"></section>
+
+  <section class="chart-card">
+    <svg id="chart" viewBox="0 0 900 420" preserveAspectRatio="none"></svg>
+  </section>
+
+  <section class="controls">
+    <button id="play-btn" type="button">Run</button>
+    <input id="scrubber" type="range" min="0" max="0" value="0" step="1" />
+    <span id="time-readout" class="time-readout">Time 0 / 0</span>
+  </section>
+
+  <section class="log-card">
+    <h2>Requests</h2>
+    <div class="log-scroll">
+      <table id="log-table">
+        <thead>
+          <tr><th>Time</th><th>Passenger</th><th>Source</th><th>Dest</th><th>Elevator</th></tr>
+        </thead>
+        <tbody id="log-body"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <section class="log-card">
+    <h2>Passenger Times</h2>
+    <div class="log-scroll">
+      <table id="accuracy-table">
+        <thead>
+          <tr><th>Passenger</th><th>Waiting Time</th><th>Total Time</th><th>Elevator</th></tr>
+        </thead>
+        <tbody id="accuracy-body"></tbody>
+      </table>
+    </div>
+  </section>
+
+  <script src="app.js"></script>
+</body>
+</html>

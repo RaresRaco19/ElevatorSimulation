@@ -1,0 +1,193 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Round-Robin Scheduler</title>
+<style>
+  :root {
+    --bg: #fbfaf8;
+    --panel: #ffffff;
+    --border: #e3ded6;
+    --text: #2a2724;
+    --muted: #6b655d;
+    --accent: #b5622f;
+    --accent-soft: #f1e2d6;
+    --car: #5a7a8c;
+    --car-soft: #dfe9ed;
+    --mono-bg: #f3efe8;
+    color-scheme: light dark;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1c1a18;
+      --panel: #26221f;
+      --border: #3a3530;
+      --text: #ece7e0;
+      --muted: #a89f93;
+      --accent: #e08a52;
+      --accent-soft: #3a2c22;
+      --car: #8fb4c7;
+      --car-soft: #26343b;
+      --mono-bg: #2c2825;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font: 15px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  }
+  main {
+    max-width: 760px;
+    margin: 0 auto;
+    padding: 40px 20px 64px;
+  }
+  h1 {
+    font-size: 1.55rem;
+    margin: 0 0 4px;
+    letter-spacing: -0.01em;
+  }
+  .tagline {
+    color: var(--muted);
+    margin: 0 0 32px;
+    font-size: 0.98rem;
+  }
+  h2 {
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--accent);
+    margin: 0 0 12px;
+  }
+  section { margin-bottom: 34px; }
+  ul { margin: 0; padding-left: 1.1em; }
+  li { margin-bottom: 7px; }
+  li:last-child { margin-bottom: 0; }
+  code {
+    background: var(--mono-bg);
+    border-radius: 4px;
+    padding: 0.1em 0.35em;
+    font-size: 0.88em;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 18px 20px;
+  }
+  .callout {
+    background: var(--accent-soft);
+    border-radius: 10px;
+    padding: 14px 18px;
+    font-size: 0.94rem;
+  }
+  .callout code { background: rgba(0,0,0,0.08); }
+  @media (prefers-color-scheme: dark) { .callout code { background: rgba(255,255,255,0.1); } }
+  svg { width: 100%; height: auto; display: block; }
+  .diagram-caption {
+    color: var(--muted);
+    font-size: 0.82rem;
+    margin-top: 8px;
+  }
+  footer {
+    margin-top: 40px;
+    color: var(--muted);
+    font-size: 0.82rem;
+    border-top: 1px solid var(--border);
+    padding-top: 14px;
+  }
+</style>
+</head>
+<body>
+<main>
+  <h1>Round-Robin Scheduler</h1>
+  <p class="tagline">Cyclic, fixed-rotation assignment &mdash; <code>src/elevator_sim/schedulers/round_robin.py</code></p>
+
+  <section>
+    <h2>How it works</h2>
+    <ul>
+      <li><strong>Cyclic assignment.</strong> Elevators are handed requests in a fixed rotation: <code>elevators[next_index % n]</code>, and the pointer always advances.</li>
+      <li><strong>No positional awareness.</strong> Assignment doesn't factor in any elevator's current position, remaining stop queue, or capacity.</li>
+      <li><strong>One exception: same-tick batching.</strong> Requests that arrive in the <em>same tick</em> and head the <em>same direction</em> are bucketed onto the car the pointer is currently on, instead of each claiming a fresh car off the rotation.</li>
+      <li><strong>Why the exception exists.</strong> Without it, a burst of simultaneous compatible requests would pointlessly occupy every elevator at once.</li>
+      <li><strong>Wait estimate.</strong> Always the naive distance guess: <code>abs(elevator.current_floor &minus; request.source)</code>.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Diagram</h2>
+    <div class="panel">
+      <svg viewBox="0 0 720 300" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Round robin rotation and batching diagram">
+        <defs>
+          <marker id="arrow" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" fill="var(--muted)"></path>
+          </marker>
+        </defs>
+
+        <!-- Row 1: fixed rotation -->
+        <text x="0" y="18" font-size="12" fill="var(--muted)" font-family="ui-monospace, Menlo, Consolas, monospace">FIXED ROTATION &mdash; every request advances the pointer</text>
+
+        <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="13">
+          <!-- elevator boxes E0 E1 E2 repeated to show cycling -->
+          <g id="row1cars">
+            <rect x="20"  y="34" width="54" height="40" rx="8" fill="var(--car-soft)" stroke="var(--car)"></rect>
+            <text x="47" y="59" text-anchor="middle" fill="var(--car)">E0</text>
+            <rect x="120" y="34" width="54" height="40" rx="8" fill="var(--car-soft)" stroke="var(--car)"></rect>
+            <text x="147" y="59" text-anchor="middle" fill="var(--car)">E1</text>
+            <rect x="220" y="34" width="54" height="40" rx="8" fill="var(--car-soft)" stroke="var(--car)"></rect>
+            <text x="247" y="59" text-anchor="middle" fill="var(--car)">E2</text>
+            <rect x="320" y="34" width="54" height="40" rx="8" fill="var(--car-soft)" stroke="var(--car)"></rect>
+            <text x="347" y="59" text-anchor="middle" fill="var(--car)">E0</text>
+          </g>
+
+          <!-- requests 1..4 arriving on different ticks, each to the next car -->
+          <text x="47"  y="104" text-anchor="middle" fill="var(--accent)">R1</text>
+          <text x="147" y="104" text-anchor="middle" fill="var(--accent)">R2</text>
+          <text x="247" y="104" text-anchor="middle" fill="var(--accent)">R3</text>
+          <text x="347" y="104" text-anchor="middle" fill="var(--accent)">R4</text>
+          <path d="M47,98 L47,78"   stroke="var(--accent)" stroke-width="1.5" marker-end="url(#arrow)" fill="none"></path>
+          <path d="M147,98 L147,78" stroke="var(--accent)" stroke-width="1.5" marker-end="url(#arrow)" fill="none"></path>
+          <path d="M247,98 L247,78" stroke="var(--accent)" stroke-width="1.5" marker-end="url(#arrow)" fill="none"></path>
+          <path d="M347,98 L347,78" stroke="var(--accent)" stroke-width="1.5" marker-end="url(#arrow)" fill="none"></path>
+          <text x="20" y="118" font-size="11" fill="var(--muted)">ticks:</text>
+          <text x="47" y="118" text-anchor="middle" font-size="11" fill="var(--muted)">t0</text>
+          <text x="147" y="118" text-anchor="middle" font-size="11" fill="var(--muted)">t1</text>
+          <text x="247" y="118" text-anchor="middle" font-size="11" fill="var(--muted)">t2</text>
+          <text x="347" y="118" text-anchor="middle" font-size="11" fill="var(--muted)">t3</text>
+        </g>
+
+        <line x1="0" y1="148" x2="720" y2="148" stroke="var(--border)"></line>
+
+        <!-- Row 2: batching exception -->
+        <text x="0" y="172" font-size="12" fill="var(--muted)" font-family="ui-monospace, Menlo, Consolas, monospace">SAME-TICK, SAME-DIRECTION &mdash; requests bucket onto one car</text>
+
+        <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="13">
+          <rect x="20"  y="188" width="54" height="40" rx="8" fill="var(--car-soft)" stroke="var(--car)"></rect>
+          <text x="47" y="213" text-anchor="middle" fill="var(--car)">E1</text>
+          <rect x="160" y="188" width="54" height="40" rx="8" fill="var(--car-soft)" stroke="var(--car)"></rect>
+          <text x="187" y="213" text-anchor="middle" fill="var(--car)">E2</text>
+
+          <!-- two same-tick UP requests converging on E1 -->
+          <text x="0"   y="262" font-size="11" fill="var(--accent)">R5 (UP)</text>
+          <text x="90"  y="262" font-size="11" fill="var(--accent)">R6 (UP)</text>
+          <path d="M15,255 Q40,235 47,232" stroke="var(--accent)" stroke-width="1.5" marker-end="url(#arrow)" fill="none"></path>
+          <path d="M105,255 Q65,235 52,232" stroke="var(--accent)" stroke-width="1.5" marker-end="url(#arrow)" fill="none"></path>
+          <text x="47" y="278" text-anchor="middle" font-size="11" fill="var(--muted)">t4 (same tick)</text>
+
+          <!-- next tick request advances pointer to E2 -->
+          <text x="187" y="262" text-anchor="middle" font-size="11" fill="var(--accent)">R7 (UP)</text>
+          <path d="M187,255 L187,232" stroke="var(--accent)" stroke-width="1.5" marker-end="url(#arrow)" fill="none"></path>
+          <text x="187" y="278" text-anchor="middle" font-size="11" fill="var(--muted)">t5</text>
+        </g>
+      </svg>
+      <p class="diagram-caption">Top: absent batching, every request advances the pointer to the next car. Bottom: R5 and R6 arrive on the same tick heading the same direction, so both land on E1 and the pointer advances only once; R7 arrives a tick later and gets the next car, E2.</p>
+    </div>
+  </section>
+
+  <footer>See <code>src/elevator_sim/schedulers/round_robin.py</code> and <code>src/elevator_sim/schedulers/README.md</code> for the implementation.</footer>
+</main>
+</body>
+</html>

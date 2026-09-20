@@ -1,0 +1,3 @@
+# Kept minimal — simulation core is stdlib-only by design.
+matplotlib
+pytest

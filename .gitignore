@@ -1,0 +1,22 @@
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+env/
+*.egg-info/
+.pytest_cache/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Editors
+.vscode/
+.idea/
+
+# Bulk/ad-hoc simulation outputs (curated examples are committed, see outputs/.gitignore)
+outputs/*
+!outputs/.gitignore
+!outputs/examples/

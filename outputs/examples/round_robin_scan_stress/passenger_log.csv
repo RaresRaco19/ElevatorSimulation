@@ -1,0 +1,11 @@
+id,source,dest,request_time,elevator,estimated_wait_time,pickup_time,actual_wait_time,dropoff_time,travel_time,total_time
+passenger1,1,55,0,E1,0,0,0,54,54,54
+passenger2,30,2,0,E2,29,29,29,117,88,117
+passenger3,10,45,0,E1,9,9,9,44,35,44
+passenger4,50,5,5,E3,49,54,49,119,65,114
+passenger5,15,58,8,E4,14,22,14,65,43,57
+passenger6,55,3,12,E5,54,66,54,128,62,116
+passenger7,2,40,15,E6,1,16,1,54,38,39
+passenger8,58,20,20,E1,37,57,37,99,42,79
+passenger9,4,50,25,E2,22,115,90,167,52,142
+passenger10,45,1,30,E3,19,49,19,123,74,93
