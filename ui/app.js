@@ -5,14 +5,15 @@
 // (waiting time + total time per passenger, once each trip completes), and an
 // always-visible run summary (count, min/avg/max wait & total time).
 //
-// The run dropdown is populated by parsing the directory-listing pages that
-// `python -m http.server` serves for `outputs/` and `outputs/examples/` (see
-// discoverRuns()) — no manifest file to keep in sync, any run you generate shows up
-// automatically. This only works when the static server actually emits a directory
-// listing; if it doesn't, DEFAULT_RUN_DIR is used as the sole fallback option.
+// A Runs/Config Explorer toggle in the top-right corner switches between two ways of
+// picking a run: a flat dropdown over outputs/ and outputs/runs/ (discovered by
+// scraping python -m http.server's directory listings — see discoverRuns()), or four
+// cascading dropdowns (scenario -> scheduler/car_policy -> elevators -> capacity) built
+// entirely from outputs/sweep/manifest.json (produced by analysis/scripts/run_sweep.py).
 
-const DEFAULT_RUN_DIR = "../outputs/examples/round_robin_scan_demo";
-const RUN_ROOTS = ["../outputs/", "../outputs/examples/"];
+const DEFAULT_RUN_DIR = "../outputs/runs/round_robin_scan_full_day";
+const RUN_ROOTS = ["../outputs/", "../outputs/runs/"];
+const SWEEP_MANIFEST_URL = "../outputs/sweep/manifest.json";
 const TICK_MS = 300;
 const PALETTE = ["#4fd1c5", "#f6ad55", "#f687b3", "#63b3ed", "#68d391", "#fc8181"];
 
@@ -23,6 +24,13 @@ const runPicker = document.getElementById("run-picker");
 const runPickerBtn = document.getElementById("run-picker-btn");
 const runPickerLabel = document.getElementById("run-picker-label");
 const runPickerList = document.getElementById("run-picker-list");
+const modeToggle = document.getElementById("mode-toggle");
+const sweepPicker = document.getElementById("sweep-picker");
+const sweepScenarioEl = document.getElementById("sweep-scenario");
+const sweepPairEl = document.getElementById("sweep-pair");
+const sweepElevatorsEl = document.getElementById("sweep-elevators");
+const sweepCapacityEl = document.getElementById("sweep-capacity");
+const sweepMessageEl = document.getElementById("sweep-message");
 const playBtn = document.getElementById("play-btn");
 const scrubber = document.getElementById("scrubber");
 const timeReadout = document.getElementById("time-readout");
@@ -79,7 +87,7 @@ async function listDir(path) {
 
 // Finds every run directory under RUN_ROOTS by listing them and keeping only entries
 // that actually contain a config.json (which filters out things like a stray
-// examples/README.md or an unrelated subfolder with no extra bookkeeping needed).
+// runs/README.md or an unrelated subfolder with no extra bookkeeping needed).
 async function discoverRuns() {
   const candidates = [];
   for (const root of RUN_ROOTS) {
@@ -164,6 +172,184 @@ document.addEventListener("keydown", (e) => {
   if (e.key === "Escape") closePicker();
 });
 
+// --- Config Explorer mode: cascading scenario -> (scheduler, car_policy) ->
+// elevators -> capacity selection, driven entirely by outputs/sweep/manifest.json
+// (produced by analysis/scripts/run_sweep.py). Sits alongside the flat Runs picker
+// above — no shared state beyond the final resolved run directory, handed to the
+// same loadRun().
+
+let sweepManifest = null;
+
+function numericSort(values) {
+  return [...new Set(values)].sort((a, b) => a - b);
+}
+
+function alphaSort(values) {
+  return [...new Set(values)].sort();
+}
+
+async function loadSweepManifest() {
+  if (sweepManifest) return sweepManifest;
+  const res = await fetch(SWEEP_MANIFEST_URL);
+  if (!res.ok) throw new Error(`manifest fetch failed: ${res.status}`);
+  sweepManifest = await res.json();
+  return sweepManifest;
+}
+
+function sweepScenarios() {
+  return alphaSort(sweepManifest.map((r) => r.scenario));
+}
+
+function sweepPairs(scenario) {
+  return alphaSort(
+    sweepManifest
+      .filter((r) => r.scenario === scenario && r.converged)
+      .map((r) => `${r.scheduler}|${r.car_policy}`)
+  );
+}
+
+function sweepElevators(scenario, pairKey) {
+  const [scheduler, carPolicy] = pairKey.split("|");
+  return numericSort(
+    sweepManifest
+      .filter(
+        (r) =>
+          r.scenario === scenario &&
+          r.scheduler === scheduler &&
+          r.car_policy === carPolicy &&
+          r.converged
+      )
+      .map((r) => r.elevators)
+  );
+}
+
+function sweepCapacities(scenario, pairKey, elevators) {
+  const [scheduler, carPolicy] = pairKey.split("|");
+  return numericSort(
+    sweepManifest
+      .filter(
+        (r) =>
+          r.scenario === scenario &&
+          r.scheduler === scheduler &&
+          r.car_policy === carPolicy &&
+          r.elevators === elevators &&
+          r.converged
+      )
+      .map((r) => r.capacity)
+  );
+}
+
+function findSweepRecord(scenario, pairKey, elevators, capacity) {
+  const [scheduler, carPolicy] = pairKey.split("|");
+  return sweepManifest.find(
+    (r) =>
+      r.scenario === scenario &&
+      r.scheduler === scheduler &&
+      r.car_policy === carPolicy &&
+      r.elevators === elevators &&
+      r.capacity === capacity &&
+      r.converged
+  );
+}
+
+function fillSelect(selectEl, values, formatFn) {
+  selectEl.innerHTML = "";
+  values.forEach((v) => {
+    const option = document.createElement("option");
+    option.value = String(v);
+    option.textContent = formatFn ? formatFn(v) : String(v);
+    selectEl.appendChild(option);
+  });
+}
+
+function populateSweepElevators() {
+  const elevators = sweepElevators(sweepScenarioEl.value, sweepPairEl.value);
+  fillSelect(sweepElevatorsEl, elevators, (n) => `${n} elevator${n === 1 ? "" : "s"}`);
+}
+
+function populateSweepCapacities() {
+  const elevators = Number(sweepElevatorsEl.value);
+  const capacities = sweepCapacities(sweepScenarioEl.value, sweepPairEl.value, elevators);
+  fillSelect(sweepCapacityEl, capacities, (c) => `capacity ${c}`);
+}
+
+function populateSweepPairs() {
+  const pairs = sweepPairs(sweepScenarioEl.value);
+  fillSelect(sweepPairEl, pairs, (p) => p.replace("|", " + "));
+}
+
+function loadSelectedSweepRun() {
+  const record = findSweepRecord(
+    sweepScenarioEl.value,
+    sweepPairEl.value,
+    Number(sweepElevatorsEl.value),
+    Number(sweepCapacityEl.value)
+  );
+  if (!record) return;
+  const dir = `../outputs/${record.run_dir}`;
+  stopPlaying();
+  currentRunDir = dir;
+  loadRun(dir).catch((err) => {
+    runInfoEl.textContent = "Failed to load run data — see console.";
+    console.error(err);
+  });
+}
+
+sweepScenarioEl.addEventListener("change", () => {
+  populateSweepPairs();
+  populateSweepElevators();
+  populateSweepCapacities();
+  loadSelectedSweepRun();
+});
+sweepPairEl.addEventListener("change", () => {
+  populateSweepElevators();
+  populateSweepCapacities();
+  loadSelectedSweepRun();
+});
+sweepElevatorsEl.addEventListener("change", () => {
+  populateSweepCapacities();
+  loadSelectedSweepRun();
+});
+sweepCapacityEl.addEventListener("change", loadSelectedSweepRun);
+
+async function activateSweepMode() {
+  try {
+    await loadSweepManifest();
+  } catch (err) {
+    console.warn("Sweep manifest not available; run analysis/scripts/run_sweep.py first.", err);
+    sweepMessageEl.textContent = "Sweep not available — run analysis/scripts/run_sweep.py first.";
+    sweepMessageEl.hidden = false;
+    [sweepScenarioEl, sweepPairEl, sweepElevatorsEl, sweepCapacityEl].forEach((el) => (el.hidden = true));
+    return;
+  }
+  sweepMessageEl.hidden = true;
+  [sweepScenarioEl, sweepPairEl, sweepElevatorsEl, sweepCapacityEl].forEach((el) => (el.hidden = false));
+  fillSelect(sweepScenarioEl, sweepScenarios());
+  populateSweepPairs();
+  populateSweepElevators();
+  populateSweepCapacities();
+  loadSelectedSweepRun();
+}
+
+modeToggle.addEventListener("click", (e) => {
+  const btn = e.target.closest(".mode-toggle-btn");
+  if (!btn) return;
+  const mode = btn.dataset.mode;
+  Array.from(modeToggle.children).forEach((b) => {
+    b.classList.toggle("active", b === btn);
+    b.setAttribute("aria-selected", String(b === btn));
+  });
+  if (mode === "runs") {
+    sweepPicker.hidden = true;
+    runPicker.hidden = false;
+  } else {
+    runPicker.hidden = true;
+    closePicker();
+    sweepPicker.hidden = false;
+    activateSweepMode();
+  }
+});
+
 async function loadRun(runDir) {
   const [config, positionsText, requestsText, passengerLogText, stats] = await Promise.all([
     fetch(`${runDir}/config.json`).then((r) => r.json()),
@@ -214,8 +400,9 @@ async function loadRun(runDir) {
   state.maxTime = times[times.length - 1];
   state.currentTime = 0;
 
+  const policyLabel = config.car_policy ? ` (${config.car_policy})` : "";
   runInfoEl.textContent =
-    `${config.scheduler} · ${config.floors} floors · ` +
+    `${config.scheduler}${policyLabel} · ${config.floors} floors · ` +
     `${elevatorIds.length} elevators · capacity ${config.capacity}`;
   if (config.elevators && config.elevators.length !== elevatorIds.length) {
     console.warn(

@@ -1,0 +1,12 @@
+{
+  "scheduler": "round_robin",
+  "car_policy": "look",
+  "floors": 15,
+  "elevators": [
+    "E1",
+    "E2"
+  ],
+  "capacity": 4,
+  "input_file": "data/requests/sample_capacity_overload.csv",
+  "note": "car_policy=look"
+}

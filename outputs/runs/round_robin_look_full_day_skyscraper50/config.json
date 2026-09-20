@@ -1,0 +1,16 @@
+{
+  "scheduler": "round_robin",
+  "car_policy": "look",
+  "floors": 50,
+  "elevators": [
+    "E1",
+    "E2",
+    "E3",
+    "E4",
+    "E5",
+    "E6"
+  ],
+  "capacity": 10,
+  "input_file": "data/requests/sample_full_day_skyscraper50.csv",
+  "note": "car_policy=look"
+}

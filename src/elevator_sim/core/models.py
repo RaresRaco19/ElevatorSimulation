@@ -27,6 +27,7 @@ class Elevator:
     direction: Direction = Direction.IDLE
     onboard: list = field(default_factory=list)  # list[Passenger]
     stop_queue: set = field(default_factory=set)  # floors with a pending pickup/dropoff
+    serviceable_floors: frozenset[int] | None = None  # None = stops at every floor
 
 
 @dataclass

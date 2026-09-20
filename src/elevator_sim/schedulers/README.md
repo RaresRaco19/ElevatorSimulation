@@ -15,7 +15,7 @@ class Scheduler(ABC):
 A scheduler owns its own `estimated_wait_time` guess — the engine just records
 whatever comes back. This matters: a naive scheduler and a well-informed one can
 report very different numbers for the same request, and that gap is itself useful
-signal (see `outputs/examples/README.md`'s `estimate_drift`).
+signal (see `outputs/runs/README.md`'s `estimate_drift`).
 
 ## Implementations
 
@@ -28,8 +28,13 @@ signal (see `outputs/examples/README.md`'s `estimate_drift`).
   `estimated_wait_time` is always the naive `abs(elevator.current_floor -
   request.source)`.
 
-- **`express.py`**, **`zone_based.py`** (stubs) — bonus algorithms, not yet
-  implemented. See each file's header comment for the intended design.
+- **`express.py`** (implemented, not yet wired in) — express cars restricted to a
+  stride-based `serviceable_floors` subset; see the module docstring for the
+  eligibility/fallback rule and its no-transfer limitation. `run_simulation.py`'s
+  `SCHEDULERS` registry doesn't build express fleets yet — that's a separate pass.
+
+- **`zone_based.py`** (stub) — bonus algorithm, not yet implemented. See its header
+  comment for the intended design.
 
 ## Not implemented yet: a cost/lookahead-aware scheduler
 

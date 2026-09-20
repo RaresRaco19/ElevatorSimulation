@@ -20,15 +20,13 @@ Recommended run config (`--elevators`/`--floors`/`--capacity`) is given for each
 below — building size/fleet is a CLI flag, not part of the CSV, so any of these can be
 re-run with a different configuration to see how it changes the outcome.
 
-- `sample_basic.csv` (3 / 20 / 8) — small hand-crafted scenario (the example from the
-  assignment PDF): 3 requests, 2 of them simultaneous at t=0.
 - `sample_stress.csv` (6 / 60 / 8) — 10 requests spread across t=0..30, exercising:
   multiple simultaneous requests at t=0 (some same-direction, some opposite), pickups
   that fall along an elevator's already-committed path (mid-route stops), and requests
   that force an elevator to reverse across most of the building. Used throughout this
   project's scheduler/car-policy comparisons — see
-  `outputs/examples/round_robin_scan_stress/` and
-  `outputs/examples/round_robin_look_stress/`.
+  `outputs/runs/round_robin_scan_stress/` and
+  `outputs/runs/round_robin_look_stress/`.
 - `sample_full_day.csv` (4 / 35 / 8) — 44 requests modeling a full simulated day:
   morning up-peak lobby surge (capacity stress), contradictory same-floor/same-tick
   pairs, a mid-service trickle with reversal-forcing long hauls, a lunch cluster of

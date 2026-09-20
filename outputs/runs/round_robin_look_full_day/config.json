@@ -1,0 +1,14 @@
+{
+  "scheduler": "round_robin",
+  "car_policy": "look",
+  "floors": 35,
+  "elevators": [
+    "E1",
+    "E2",
+    "E3",
+    "E4"
+  ],
+  "capacity": 8,
+  "input_file": "data/requests/sample_full_day.csv",
+  "note": "car_policy=look"
+}

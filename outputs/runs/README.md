@@ -1,0 +1,53 @@
+# Curated runs
+
+A small, curated set of simulation runs is committed here so a reviewer can browse
+results, run the analysis scripts, and use the `ui/` playback tool without having to
+run the simulation themselves first.
+
+Each run lives in its own folder, named `<scheduler>_<car_policy>_<scenario>/`, and
+contains:
+
+- `config.json` — scheduler, car_policy, elevators, floors, capacity, and input file used
+- `positions_log.csv` — wide format, one row per time step, one column per elevator id
+  (e.g. `time,E1,E2,E3`), per the assignment's own spec wording ("one row per timestamp,
+  showing elevator positions at that time")
+- `requests.csv` — the input requests for that run (`time,id,source,dest`), copied in so
+  the run's folder is self-contained
+- `passenger_log.csv` — one row per passenger, with full timing detail: `id, source,
+  dest, request_time, elevator, estimated_wait_time, pickup_time, actual_wait_time,
+  dropoff_time, travel_time, total_time`. `estimated_wait_time` is whichever number the
+  *scheduler* that made the assignment reported (see
+  `src/elevator_sim/schedulers/README.md`) — currently always `round_robin`'s naive
+  `|elevator_floor - source|` guess that ignores the elevator's committed stops.
+  Comparing `estimated_wait_time` against `actual_wait_time` is the point: it shows
+  when a scheduler's promise didn't hold, and by how much.
+- `passenger_stats.json` — aggregate over `passenger_log.csv`: min/max/avg `wait_time`
+  and `total_time`, plus an `estimate_drift` summary (max/avg gap between estimated and
+  actual wait, and how many passengers were delayed beyond their estimate).
+
+These are regenerated directly into this folder by `src/elevator_sim/run_simulation.py`
+(not auto-synced from ad-hoc runs elsewhere) — only promote a run here once it's worth
+showing.
+
+## Current runs
+
+Building configuration (elevator count, floors, capacity) is whatever each run was
+generated with — check that run's own `config.json` rather than assuming a number
+here, since any of these can be (and have been) regenerated with different values.
+
+- **`round_robin_scan_full_day/`** — `sample_full_day.csv` (44 requests, a full
+  simulated day) with `round_robin` + `scan`. Avg wait 9.9 ticks, max 46.
+- **`round_robin_look_full_day/`** — same scenario/input as `round_robin_scan_full_day/`,
+  swapping in `look` for `scan` to compare directly. Avg wait 13.3 ticks, max 53 —
+  slightly worse here despite `look`'s usually-shorter routes, since this scenario's
+  mid-service reversal-forcing requests interact differently with `look`'s earlier
+  turnarounds than with `scan`'s full sweeps.
+- **`round_robin_scan_stress/`** — `sample_stress.csv` with `round_robin` + `scan`.
+  Shows round_robin's naive estimate diverging sharply from actual wait time for two
+  passengers whose assigned elevator was already busy running the far end of a
+  true-SCAN sweep.
+- **`round_robin_look_stress/`** — same scenario/input as `round_robin_scan_stress/`,
+  swapping in `look` for `scan`. Direct evidence of `scan.py`'s wasted-sweep cost:
+  max wait time drops from 90 to 54 and `estimate_drift` (avg) from 6.8 to 0.8 ticks
+  versus the sibling `scan` run — same requests, same elevators, only the reversal
+  rule differs.

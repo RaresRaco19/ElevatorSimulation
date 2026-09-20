@@ -22,7 +22,7 @@ rule generally needs to know the building's bounds, not just the elevator's own 
   every committed stop along the way, until reaching floor 1 or the top floor — then
   reverse, even with no remaining requests in that direction. Chosen as the first,
   simplest policy to implement; it means an elevator can take a much longer route than
-  strictly necessary (see `outputs/examples/round_robin_scan_stress/` for a real example
+  strictly necessary (see `outputs/runs/round_robin_scan_stress/` for a real example
   of one elevator sweeping the entire building for a single distant drop-off). See
   [`docs/scan.html`](../../../docs/scan.html) for a concise visual walkthrough.
 

@@ -16,7 +16,7 @@ Thumbs.db
 .vscode/
 .idea/
 
-# Bulk/ad-hoc simulation outputs (curated examples are committed, see outputs/.gitignore)
+# Bulk/ad-hoc simulation outputs (curated runs are committed, see outputs/.gitignore)
 outputs/*
 !outputs/.gitignore
-!outputs/examples/
+!outputs/runs/

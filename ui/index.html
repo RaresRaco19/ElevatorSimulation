@@ -10,12 +10,23 @@
   <header class="page-header">
     <h1>Elevator Simulation Playback</h1>
     <div class="header-right">
+      <div class="mode-toggle" id="mode-toggle" role="tablist" aria-label="Run source">
+        <button type="button" class="mode-toggle-btn active" data-mode="runs" role="tab" aria-selected="true">Runs</button>
+        <button type="button" class="mode-toggle-btn" data-mode="sweep" role="tab" aria-selected="false">Config Explorer</button>
+      </div>
       <div class="run-picker" id="run-picker">
         <button type="button" id="run-picker-btn" class="run-picker-btn" aria-haspopup="listbox" aria-expanded="false">
           <span id="run-picker-label">Loading…</span>
           <span class="run-picker-caret" aria-hidden="true">▾</span>
         </button>
         <ul id="run-picker-list" class="run-picker-list" role="listbox" hidden></ul>
+      </div>
+      <div class="sweep-picker" id="sweep-picker" hidden>
+        <select id="sweep-scenario" class="sweep-select" aria-label="Scenario"></select>
+        <select id="sweep-pair" class="sweep-select" aria-label="Scheduler + car policy"></select>
+        <select id="sweep-elevators" class="sweep-select" aria-label="Elevators"></select>
+        <select id="sweep-capacity" class="sweep-select" aria-label="Capacity"></select>
+        <div id="sweep-message" class="sweep-message" hidden></div>
       </div>
       <div id="run-info" class="run-info">Loading run…</div>
     </div>

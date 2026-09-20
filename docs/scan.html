@@ -112,7 +112,7 @@
       <li><strong>Keep going.</strong> While an elevator has committed stops, it keeps moving in its current direction, serving every stop it passes along the way.</li>
       <li><strong>Reversal rule.</strong> It only turns around on reaching floor 1 or the top floor &mdash; never early, even once nothing remains to serve in that direction.</li>
       <li><strong>Picking a direction from idle.</strong> If any committed stop is above the current floor, go UP; else if any is below, go DOWN; else (the only pending stop is the current floor) stay IDLE.</li>
-      <li><strong>Consequence.</strong> An elevator can take a much longer route than strictly necessary &mdash; see <code>outputs/examples/round_robin_scan_stress/</code> for a real example of one elevator sweeping the entire building for a single distant drop-off.</li>
+      <li><strong>Consequence.</strong> An elevator can take a much longer route than strictly necessary &mdash; see <code>outputs/runs/round_robin_scan_stress/</code> for a real example of one elevator sweeping the entire building for a single distant drop-off.</li>
     </ul>
   </section>
 
@@ -177,7 +177,7 @@
 
   <section>
     <h2>Contrast</h2>
-    <p class="callout">Contrast with <code>look.py</code>, which reverses as soon as nothing remains further in the current direction instead of always running to the physical end. The measured cost of SCAN's extra sweep, same input both ways: <code>outputs/examples/round_robin_scan_stress/</code> vs <code>round_robin_look_stress/</code> &mdash; max wait time 90 vs 54 ticks, average <code>estimate_drift</code> 6.8 vs 0.8.</p>
+    <p class="callout">Contrast with <code>look.py</code>, which reverses as soon as nothing remains further in the current direction instead of always running to the physical end. The measured cost of SCAN's extra sweep, same input both ways: <code>outputs/runs/round_robin_scan_stress/</code> vs <code>round_robin_look_stress/</code> &mdash; max wait time 90 vs 54 ticks, average <code>estimate_drift</code> 6.8 vs 0.8.</p>
   </section>
 
   <footer>See <code>src/elevator_sim/car_policies/scan.py</code> and <code>src/elevator_sim/car_policies/README.md</code> for the implementation and fuller policy comparison.</footer>

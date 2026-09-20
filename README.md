@@ -25,8 +25,8 @@ time until every request is served.
   together.
 - `data/requests/` — sample input request CSVs. See
   [`data/requests/README.md`](data/requests/README.md).
-- `outputs/` — generated run outputs; `outputs/examples/` holds a curated, committed
-  set for reviewers. See [`outputs/examples/README.md`](outputs/examples/README.md).
+- `outputs/` — generated run outputs; `outputs/runs/` holds a curated, committed
+  set for reviewers. See [`outputs/runs/README.md`](outputs/runs/README.md).
 - `analysis/` — scripts that turn run outputs into charts (still TODO stubs). See
   [`analysis/README.md`](analysis/README.md).
 - `ui/` — static web app that replays a run's elevator movement tick by tick. See
@@ -79,18 +79,21 @@ Currently available flag values:
 
 Each run writes five files into `--out`: `config.json`, `positions_log.csv`,
 `requests.csv`, `passenger_log.csv`, `passenger_stats.json`. See
-[`outputs/examples/README.md`](outputs/examples/README.md) for the exact schema of
+[`outputs/runs/README.md`](outputs/runs/README.md) for the exact schema of
 each.
 
 ### 4. Watch it play back in the browser
 
-1. Open `ui/app.js` and point the `RUN_DIR` constant at your run's output folder,
-   relative to `ui/` (e.g. `"../outputs/round_robin_scan_sample_basic"`).
-2. Serve the **repository root** (not `ui/` itself) with any static file server:
+1. Serve the **repository root** (not `ui/` itself) with any static file server:
    ```
    python -m http.server 8000
    ```
-3. Open `http://localhost:8000/ui/` in a browser.
+2. Open `http://localhost:8000/ui/` in a browser. The **Runs** tab (default) picks
+   up any run under `outputs/` or `outputs/runs/` automatically, including the one
+   you just generated with `--out`. The **Config Explorer** tab instead browses the
+   full config sweep — run `python analysis/scripts/run_sweep.py` first, then use its
+   four dropdowns (Scenario, Scheduler+CarPolicy, Elevators, Capacity) to pick a run.
+   See `ui/README.md` for details.
 
 ### 5. Run the tests
 

@@ -2,8 +2,8 @@
 
 A single, dependency-free, dark-themed page that replays a completed simulation run: an
 SVG line chart with time on the X axis and floor on the Y axis, one colored line per
-elevator. A run picker in the top-right corner lets you switch between any run it can
-discover (see "Picking a run" below). An always-visible Run Summary shows passenger
+elevator. A **Runs / Config Explorer** toggle in the top-right corner switches
+between two ways of picking a run (see "Picking a run" below). An always-visible Run Summary shows passenger
 count and min/avg/max wait & total time for the whole run. You can toggle individual
 elevators on/off, press **Run** to play through the log tick by tick, or drag the
 scrubber to jump straight to any timestamp. A Requests log at the bottom fills in with
@@ -26,19 +26,30 @@ then open `http://localhost:8000/ui/`.
 
 ## Picking a run
 
-On load, `app.js` discovers every run directory under `outputs/` and
-`outputs/examples/` by parsing the directory-listing pages `python -m http.server`
+**Runs mode** (default): `app.js` discovers every run directory under `outputs/`
+and `outputs/runs/` by parsing the directory-listing pages `python -m http.server`
 serves for them, keeping only entries that actually contain a `config.json` — no
 manifest file to keep in sync, any run you generate shows up automatically. Pick one
 from the dropdown in the top-right corner to load it. This only works when the static
 server emits a directory listing; if it doesn't, the page falls back to a single
 hardcoded default run (`DEFAULT_RUN_DIR` in `app.js`).
 
+**Config Explorer mode**: switch the toggle to browse the full config sweep produced
+by `analysis/scripts/run_sweep.py` (see `analysis/README.md`) — run that script first
+if you haven't yet. Four cascading dropdowns — Scenario, Scheduler+CarPolicy,
+Elevators, Capacity — are built entirely from `outputs/sweep/manifest.json`, filtered
+at each level to combinations that actually converged; picking all four loads that run
+exactly like Runs mode does. If the sweep hasn't been run yet (`manifest.json`
+404s), the dropdowns are replaced with a message telling you to run `run_sweep.py`
+first, rather than erroring.
+
 ## Expected input
 
 Each run folder needs:
 
-- `config.json` — `{ scheduler, floors, elevators: [...ids], capacity }`
+- `config.json` — `{ scheduler, car_policy, floors, elevators: [...ids], capacity }`.
+  `car_policy` is shown in the run-info line when present; older runs generated before
+  this field existed simply omit it there.
 - `positions_log.csv` — wide format, one row per time step, one column per elevator id
   (e.g. `time,E1,E2,E3`), written by `src/elevator_sim/core/io.py`
 - `requests.csv` — same `time,id,source,dest` schema as `data/requests/*.csv`, copied

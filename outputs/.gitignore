@@ -1,7 +1,7 @@
 # Every run's output lives under outputs/<scheduler>_<scenario>/ and is regenerable
-# by re-running the simulation, so only outputs/examples/ (curated, committed runs
-# used by the analysis scripts and the UI demo) is tracked.
+# by re-running the simulation, so only outputs/runs/ (curated, committed runs used
+# by the analysis scripts and the UI) is tracked.
 *
 !.gitignore
-!examples/
-!examples/**
+!runs/
+!runs/**

@@ -1,0 +1,15 @@
+{
+  "scheduler": "round_robin",
+  "car_policy": "scan",
+  "floors": 40,
+  "elevators": [
+    "E1",
+    "E2",
+    "E3",
+    "E4",
+    "E5"
+  ],
+  "capacity": 10,
+  "input_file": "data/requests/sample_downpeak_highrise40.csv",
+  "note": "car_policy=scan"
+}

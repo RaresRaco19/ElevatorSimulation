@@ -55,6 +55,7 @@ def main():
     io.write_run_config(
         {
             "scheduler": args.scheduler,
+            "car_policy": args.car_policy,
             "floors": args.floors,
             "elevators": elevator_ids,
             "capacity": args.capacity,
