@@ -140,7 +140,7 @@ current figures show.
 
 ## Time spent
 
-TODO
+About two days of focused work — roughly 16 hours, across two 8-hour days.
 
 ## Assumptions, simplifications, trade-offs
 
