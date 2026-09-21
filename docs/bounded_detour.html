@@ -99,36 +99,45 @@
     border-top: 1px solid var(--border);
     padding-top: 14px;
   }
+  .lede { margin: 0 0 30px; font-size: 1.02rem; }
 </style>
 </head>
 <body>
 <main>
   <h1>Bounded Detour Car Policy</h1>
-  <p class="tagline">LOOK, but it may turn back once &mdash; within hard bounds &mdash; <code>src/elevator_sim/car_policies/bounded_detour.py</code></p>
+  <p class="tagline">LOOK, but it may turn back &mdash; within hard bounds &mdash; <code>src/elevator_sim/car_policies/bounded_detour.py</code></p>
+
+  <p class="lede">Press the button one floor behind a rising car under plain LOOK and you wait out its entire remaining climb <em>and</em> the trip back down. Letting it turn back freely is worse &mdash; the car thrashes and everyone aboard pays, with no ceiling. So: turn back, but bound it.</p>
 
   <section>
-    <h2>The problem it fixes</h2>
-    <ul>
-      <li><strong>LOOK is unfair to whoever it just passed.</strong> Press the button one floor behind a rising car and you wait out its entire remaining climb <em>and</em> the trip back down &mdash; however close the car actually is right now.</li>
-      <li><strong>Reversing freely is worse.</strong> A policy that turns back whenever someone is nearer behind it (<code>fcfs</code>-style) thrashes, and the passengers already aboard pay for every reversal with no ceiling on the damage.</li>
-      <li><strong>So: turn back, but bound it.</strong> A car mid-sweep may divert to one stop it has already passed and then resume exactly where it left off &mdash; only if all three bounds below allow it.</li>
-    </ul>
-  </section>
-
-  <section>
-    <h2>The three bounds</h2>
+    <h2>The bounds</h2>
     <div class="panel">
-      <ul>
-        <li><strong><code>D</code> &mdash; <code>MAX_DETOUR_DISTANCE</code>.</strong> How far back the car may divert from where it stands.</li>
-        <li><strong><code>k</code> &mdash; <code>MAX_DETOURS_PER_SWEEP</code>.</strong> How many diversions one sweep may spend. The budget refreshes on a natural reversal, not on a timer.</li>
-        <li><strong><code>F</code> &mdash; <code>MAX_FAIRNESS_DELAY</code>.</strong> How much a single diversion may delay the passengers already aboard.</li>
-      </ul>
+      <svg viewBox="0 0 720 150" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Three bounds: D max detour distance, k max detours per sweep, F max fairness delay, combining to a worst case of k times 2D per sweep">
+        <text x="0" y="13" font-size="11" fill="var(--muted)" font-family="ui-monospace, Menlo, Consolas, monospace">THREE BOUNDS, ALL THREE MUST PASS</text>
+
+        <rect x="0" y="26" width="224" height="86" rx="9" fill="var(--panel)" stroke="var(--border)"></rect>
+        <text x="112" y="54" text-anchor="middle" font-size="19" fill="var(--accent)" font-weight="600" font-family="ui-monospace, Menlo, Consolas, monospace">D</text>
+        <text x="112" y="75" text-anchor="middle" font-size="10" fill="var(--muted)" font-family="ui-monospace, Menlo, Consolas, monospace">MAX_DETOUR_DISTANCE</text>
+        <text x="112" y="97" text-anchor="middle" font-size="11" fill="var(--text)">how far back it may go</text>
+
+        <rect x="248" y="26" width="224" height="86" rx="9" fill="var(--panel)" stroke="var(--border)"></rect>
+        <text x="360" y="54" text-anchor="middle" font-size="19" fill="var(--accent)" font-weight="600" font-family="ui-monospace, Menlo, Consolas, monospace">k</text>
+        <text x="360" y="75" text-anchor="middle" font-size="10" fill="var(--muted)" font-family="ui-monospace, Menlo, Consolas, monospace">MAX_DETOURS_PER_SWEEP</text>
+        <text x="360" y="97" text-anchor="middle" font-size="11" fill="var(--text)">how many per sweep</text>
+
+        <rect x="496" y="26" width="224" height="86" rx="9" fill="var(--panel)" stroke="var(--border)"></rect>
+        <text x="608" y="54" text-anchor="middle" font-size="19" fill="var(--accent)" font-weight="600" font-family="ui-monospace, Menlo, Consolas, monospace">F</text>
+        <text x="608" y="75" text-anchor="middle" font-size="10" fill="var(--muted)" font-family="ui-monospace, Menlo, Consolas, monospace">MAX_FAIRNESS_DELAY</text>
+        <text x="608" y="97" text-anchor="middle" font-size="11" fill="var(--text)">how much others may lose</text>
+
+        <text x="360" y="138" text-anchor="middle" font-size="11.5" fill="var(--accent)">Worst case per sweep = k &times; 2D &mdash; a guarantee, not a tendency.</text>
+      </svg>
+      <p class="diagram-caption">The budget refreshes on a natural reversal, not on a timer. Every quantity involved is exact rather than sampled, so the bound is directly checkable &mdash; <code>tests/test_car_policies.py</code> checks it against a plain LOOK baseline on the same queue.</p>
     </div>
-    <p class="diagram-caption">Together these bound the worst case at exactly <code>k &times; 2D</code> extra ticks per sweep for everyone aboard. That is a guarantee rather than a tendency, because every quantity involved is exact rather than sampled &mdash; and <code>tests/test_car_policies.py</code> checks it against a plain LOOK baseline on the same queue.</p>
   </section>
 
   <section>
-    <h2>Diagram</h2>
+    <h2>One diversion, start to finish</h2>
     <div class="panel">
       <svg viewBox="0 0 720 255" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Bounded detour trajectory: a rising car at floor 4 turns back one floor to serve a stop at floor 3, then resumes its climb to floor 6, compared against a dashed plain-LOOK path that finishes the climb first">
         <!-- floor gridlines + labels, floors 1-6 -->
@@ -150,7 +159,7 @@
 
         <!-- ghost path: plain look.py finishes the climb to 6 first, then comes back down to 3 -->
         <polyline points="60,100 176,40 350,130" fill="none" stroke="var(--muted)" stroke-width="2" stroke-dasharray="5,4" opacity="0.7"></polyline>
-        <text x="430" y="70" font-size="11" fill="var(--muted)" font-family="ui-monospace, Menlo, Consolas, monospace">plain look.py finishes the climb first (dashed)</text>
+        <text x="430" y="70" font-size="11" fill="var(--muted)" font-family="ui-monospace, Menlo, Consolas, monospace">plain look.py (dashed)</text>
 
         <!-- bounded detour: 4 -> 3 -> back to 4 -> on up to 6 -->
         <polyline points="60,100 118,130 176,100 292,40" fill="none" stroke="var(--car)" stroke-width="2.5"></polyline>
@@ -164,13 +173,13 @@
         <line x1="176" y1="26" x2="292" y2="26" stroke="var(--accent)" stroke-width="1.5"></line>
         <line x1="176" y1="21" x2="176" y2="31" stroke="var(--accent)" stroke-width="1.5"></line>
         <line x1="292" y1="21" x2="292" y2="31" stroke="var(--accent)" stroke-width="1.5"></line>
-        <text x="302" y="30" font-size="11" fill="var(--accent)" font-family="ui-monospace, Menlo, Consolas, monospace">floor 6 arrives 2 ticks late = 2 &times; |4 &minus; 3|</text>
+        <text x="302" y="30" font-size="11" fill="var(--accent)" font-family="ui-monospace, Menlo, Consolas, monospace">costs: floor 6 arrives 2 ticks late = 2 &times; |4 &minus; 3|</text>
 
         <!-- what it buys: the stop at floor 3 is served at t1 instead of t5 -->
         <line x1="118" y1="208" x2="350" y2="208" stroke="var(--accent)" stroke-width="1.5"></line>
         <line x1="118" y1="203" x2="118" y2="213" stroke="var(--accent)" stroke-width="1.5"></line>
         <line x1="350" y1="203" x2="350" y2="213" stroke="var(--accent)" stroke-width="1.5"></line>
-        <text x="234" y="226" text-anchor="middle" font-size="11" fill="var(--accent)" font-family="ui-monospace, Menlo, Consolas, monospace">floor 3 served 4 ticks sooner</text>
+        <text x="234" y="226" text-anchor="middle" font-size="11" fill="var(--accent)" font-family="ui-monospace, Menlo, Consolas, monospace">buys: floor 3 served 4 ticks sooner</text>
 
         <!-- time axis -->
         <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="11" fill="var(--muted)">
@@ -181,31 +190,104 @@
           <text x="350" y="248" text-anchor="middle">t5</text>
         </g>
       </svg>
-      <p class="diagram-caption">A car at floor 4 climbing to a committed stop at floor 6, when a stop at floor 3 &mdash; one floor behind it &mdash; joins its queue. The diversion is one floor, so it costs everyone aboard exactly <code>2 &times; 1 = 2</code> ticks, and buys the passenger at floor 3 a pickup four ticks sooner. Plain LOOK (dashed) would reach floor 6 two ticks earlier but leave floor 3 waiting until t5.</p>
+      <p class="diagram-caption">A car at floor 4 climbing to a stop at 6, when a stop at 3 &mdash; one floor behind &mdash; joins its queue. It dips back, serves it, and resumes exactly where it left off.</p>
     </div>
   </section>
 
   <section>
-    <h2>Why one check covers every passenger</h2>
-    <p>A diversion is not a new kind of motion &mdash; it is a sweep extension that snaps back instead of persisting. Once the car returns to where it turned, it resumes the exact trajectory it would have taken anyway, with the diverted stop now cleared. So the surcharge is <em>flat</em>: every remaining stop is pushed back by the same <code>2 &times; distance</code>, no matter where it sits.</p>
-    <p class="callout">That is why the fairness bound is a single scalar comparison rather than a loop over everyone aboard &mdash; with zero dwell time, checking <code>F</code> once checks it for all of them. The claim is load-bearing, so <code>tests/test_trip_estimator.py</code> verifies it against a brute-force per-passenger comparison instead of assuming it. (A <em>relative</em> bound &mdash; a percentage of each passenger's own remaining trip &mdash; would bring the per-passenger loop back, since those differ.)</p>
+    <h2>Why one check covers everyone</h2>
+    <div class="panel">
+      <svg viewBox="0 0 720 176" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Three onboard stops, each delayed by exactly the same two ticks regardless of how far away it is">
+        <text x="0" y="13" font-size="11" fill="var(--muted)" font-family="ui-monospace, Menlo, Consolas, monospace">TICKS UNTIL SERVED &mdash; THE SAME DIVERSION, THREE DIFFERENT STOPS</text>
+
+        <g font-size="11.5" fill="var(--muted)" text-anchor="end">
+          <text x="122" y="47">stop at 6</text>
+          <text x="122" y="91">stop at 2</text>
+          <text x="122" y="135">stop at 1</text>
+        </g>
+
+        <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="11" text-anchor="middle">
+          <rect x="140" y="34" width="80" height="18" rx="4" fill="var(--car-soft)" stroke="var(--car)"></rect>
+          <rect x="220" y="34" width="80" height="18" rx="4" fill="var(--accent-soft)" stroke="var(--accent)"></rect>
+          <text x="260" y="47" fill="var(--accent)">+2</text>
+
+          <rect x="140" y="78" width="240" height="18" rx="4" fill="var(--car-soft)" stroke="var(--car)"></rect>
+          <rect x="380" y="78" width="80" height="18" rx="4" fill="var(--accent-soft)" stroke="var(--accent)"></rect>
+          <text x="420" y="91" fill="var(--accent)">+2</text>
+
+          <rect x="140" y="122" width="280" height="18" rx="4" fill="var(--car-soft)" stroke="var(--car)"></rect>
+          <rect x="420" y="122" width="80" height="18" rx="4" fill="var(--accent-soft)" stroke="var(--accent)"></rect>
+          <text x="460" y="135" fill="var(--accent)">+2</text>
+        </g>
+
+        <text x="360" y="166" text-anchor="middle" font-size="11.5" fill="var(--accent)">The surcharge is flat &mdash; so F is checked once, not once per passenger.</text>
+      </svg>
+      <p class="diagram-caption">A diversion is a sweep extension that snaps back instead of persisting: once the car is home, it resumes the trajectory it would have taken anyway. So every remaining stop moves by the same <code>2 &times; distance</code>, wherever it sits. That claim is load-bearing, so <code>tests/test_trip_estimator.py</code> checks it against a brute-force per-passenger comparison rather than assuming it.</p>
+    </div>
   </section>
 
   <section>
-    <h2>Where the arithmetic lives</h2>
-    <ul>
-      <li><strong>None of it is in this file.</strong> Whether a diversion is allowed is <code>trip_estimator.detour_eligible()</code>; where the sweep goes otherwise is <code>look.look_direction()</code>. This policy contributes control flow only.</li>
-      <li><strong>Which matters because the dispatcher asks the same questions.</strong> <code>schedulers/destination_dispatch.py</code> calls <code>detour_eligible()</code> too, through this policy's <code>detour_limits()</code> &mdash; so what a car actually does and what the scheduler predicted it would do are derived from one function and cannot drift apart.</li>
-      <li><strong>The car cannot remember its own sweep.</strong> <code>core/engine.py</code> overwrites <code>Elevator.direction</code> with whatever the policy last returned, so the instant a car turns back, the elevator itself no longer knows which way it was going. The policy keeps that in its own per-car state and restores it on the way out.</li>
-    </ul>
+    <h2>One gate, two callers</h2>
+    <div class="panel">
+      <svg viewBox="0 0 720 140" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Both the car policy and the scheduler call the same detour_eligible function, so movement and dispatch cannot disagree">
+        <defs>
+          <marker id="tip" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" fill="var(--muted)"></path>
+          </marker>
+        </defs>
+
+        <rect x="0" y="44" width="196" height="48" rx="9" fill="var(--car-soft)" stroke="var(--car)"></rect>
+        <text x="98" y="66" text-anchor="middle" font-size="10.5" fill="var(--car)" font-family="ui-monospace, Menlo, Consolas, monospace">bounded_detour.py</text>
+        <text x="98" y="82" text-anchor="middle" font-size="11" fill="var(--muted)">what the car does</text>
+
+        <rect x="524" y="44" width="196" height="48" rx="9" fill="var(--car-soft)" stroke="var(--car)"></rect>
+        <text x="622" y="66" text-anchor="middle" font-size="10.5" fill="var(--car)" font-family="ui-monospace, Menlo, Consolas, monospace">destination_dispatch.py</text>
+        <text x="622" y="82" text-anchor="middle" font-size="11" fill="var(--muted)">what it predicted</text>
+
+        <rect x="244" y="40" width="232" height="56" rx="9" fill="var(--accent-soft)" stroke="var(--accent)"></rect>
+        <text x="360" y="64" text-anchor="middle" font-size="10.5" fill="var(--accent)" font-family="ui-monospace, Menlo, Consolas, monospace">trip_estimator</text>
+        <text x="360" y="82" text-anchor="middle" font-size="11.5" fill="var(--accent)" font-family="ui-monospace, Menlo, Consolas, monospace">detour_eligible()</text>
+
+        <line x1="200" y1="68" x2="238" y2="68" stroke="var(--muted)" stroke-width="1.5" marker-end="url(#tip)"></line>
+        <line x1="520" y1="68" x2="482" y2="68" stroke="var(--muted)" stroke-width="1.5" marker-end="url(#tip)"></line>
+
+        <text x="360" y="126" text-anchor="middle" font-size="11.5" fill="var(--muted)">No arithmetic lives in the policy &mdash; so the two cannot drift apart.</text>
+      </svg>
+    </div>
   </section>
 
   <section>
-    <h2>Measured effect</h2>
-    <p class="callout">Its effect is mostly on the <em>tail</em>, which is what it is for. On <code>sample_full_day.csv</code> at 4 cars and capacity 8, with <code>destination_dispatch</code>: max wait drops from 30 to 19 ticks against <code>look</code>, average wait from 4.9 to 4.0 &mdash; same requests, same cars, only the reversal rule differs. Compare <code>outputs/runs/destination_dispatch_look_full_day/</code> against <code>outputs/runs/destination_dispatch_bounded_detour_full_day/</code>.</p>
+    <h2>Measured</h2>
+    <div class="panel">
+      <svg viewBox="0 0 720 130" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Bar chart: max wait falls from 30 to 19 ticks and average wait from 4.9 to 4.0">
+        <text x="0" y="13" font-size="11" fill="var(--muted)" font-family="ui-monospace, Menlo, Consolas, monospace">sample_full_day &middot; 4 cars &middot; capacity 8 &middot; destination_dispatch</text>
+        <rect x="486" y="5" width="10" height="10" rx="2" fill="var(--muted)" opacity="0.55"></rect>
+        <text x="502" y="14" font-size="11" fill="var(--muted)">look</text>
+        <rect x="556" y="5" width="10" height="10" rx="2" fill="var(--accent)"></rect>
+        <text x="572" y="14" font-size="11" fill="var(--muted)">bounded_detour</text>
+
+        <g font-size="11.5" fill="var(--muted)" text-anchor="end">
+          <text x="150" y="60">max wait</text>
+          <text x="150" y="110">avg wait</text>
+        </g>
+
+        <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="11">
+          <rect x="165" y="38" width="420" height="16" rx="4" fill="var(--muted)" opacity="0.4"></rect>
+          <text x="593" y="50" fill="var(--muted)">30</text>
+          <rect x="165" y="58" width="266" height="16" rx="4" fill="var(--accent)"></rect>
+          <text x="439" y="70" fill="var(--accent)">19</text>
+
+          <rect x="165" y="88" width="420" height="16" rx="4" fill="var(--muted)" opacity="0.4"></rect>
+          <text x="593" y="100" fill="var(--muted)">4.9</text>
+          <rect x="165" y="108" width="343" height="16" rx="4" fill="var(--accent)"></rect>
+          <text x="516" y="120" fill="var(--accent)">4.0</text>
+        </g>
+      </svg>
+      <p class="diagram-caption">Ticks, same requests and same cars &mdash; only the reversal rule differs. The effect is mostly on the <em>tail</em>, which is what the policy is for. Compare <code>outputs/runs/destination_dispatch_look_full_day/</code> against <code>outputs/runs/destination_dispatch_bounded_detour_full_day/</code>.</p>
+    </div>
   </section>
 
-  <footer>See <code>src/elevator_sim/car_policies/bounded_detour.py</code> and <code>src/elevator_sim/car_policies/README.md</code> for the implementation and fuller policy comparison; <code>docs/look.html</code> for the policy it extends.</footer>
+  <footer>See <code>src/elevator_sim/car_policies/bounded_detour.py</code> and <code>src/elevator_sim/car_policies/README.md</code> for the implementation; <code>docs/look.html</code> for the policy it extends.</footer>
 </main>
 </body>
 </html>
