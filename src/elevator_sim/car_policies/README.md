@@ -32,16 +32,47 @@ rule generally needs to know the building's bounds, not just the elevator's own 
   avoids the wasted sweeps `scan.py` is prone to. See
   [`docs/look.html`](../../../docs/look.html) for a concise visual walkthrough.
 
+- **`bounded_detour.py`** (implemented) — `look.py` plus the ability to turn back for
+  one stop the car has already passed, then resume the sweep exactly where it left off.
+  Plain LOOK is unfair to anyone standing behind a car that has just gone by: they wait
+  out the whole remaining sweep plus the return leg, however close the car actually is.
+  This policy lets the car double back, but only inside three hard bounds, so the fix
+  can't become the thrashing `fcfs` would produce:
+
+  | | |
+  | --- | --- |
+  | `MAX_DETOUR_DISTANCE` (D) | how far back the car may divert from where it stands |
+  | `MAX_DETOURS_PER_SWEEP` (k) | how many diversions one sweep may spend |
+  | `MAX_FAIRNESS_DELAY` (F) | how much one diversion may delay those already aboard |
+
+  Together these bound the worst case at exactly **`k * 2D` extra ticks per sweep** for
+  every passenger aboard — a real guarantee rather than a tendency, since every quantity
+  involved is exact (`core/trip_estimator.py`), and one `tests/test_car_policies.py`
+  checks directly. The bounds are module constants rather than CLI flags: they describe
+  how the policy behaves, not what an individual run does, so the CLI is unchanged.
+
+  Its effect is mostly on the *tail*, which is what it's for: on `sample_full_day` at
+  4 cars / capacity 8 with `destination_dispatch`, max wait drops from 30 to 19 ticks.
+  See [`docs/bounded_detour.html`](../../../docs/bounded_detour.html) for a visual
+  walkthrough.
+
 - **`fcfs.py`** (stub) — serves committed stops strictly in assignment order, ignoring
   direction efficiency entirely (may reverse repeatedly). Intended as a worst-case
   contrast baseline, not a serious policy.
 
 ## Coupling with schedulers
 
-No implemented scheduler currently couples its wait-time estimate to a specific car
-policy's movement geometry: `round_robin`'s `estimated_wait_time` is plain floor
-distance (`abs(elevator.current_floor - request.source)`), independent of whichever
-car policy (`scan` or `look`) is active. A future ETA-aware scheduler would need to
-account for this — an ETA formula tuned to `scan.py`'s true-SCAN reversal geometry
-would need adjusting before it could pair correctly with `look.py`, since `look.py`
-reverses earlier than `scan.py` does.
+A policy's reversal rule is not just its own business: any scheduler that estimates
+travel time has to know where cars turn around, and an ETA formula tuned to `scan.py`'s
+run-to-the-end geometry is simply wrong for `look.py`, which reverses earlier.
+
+Each policy therefore declares its rule as a `reversal_geometry` attribute (`base.py`,
+defaulting to LOOK — only `scan.py` overrides it), and `core/engine.py` hands the active
+policy to the scheduler through `Scheduler.bind_car_policy()`. `core/trip_estimator.py`
+takes that geometry as a parameter, so one set of formulas stays exact for both
+policies. `bounded_detour.py` additionally exposes `detour_limits()`, which is how a
+scheduler learns it may price a behind-the-car pickup at the cost of a diversion rather
+than a full reversal.
+
+The naive schedulers are untouched by any of this: `round_robin`'s `estimated_wait_time`
+is still plain floor distance, and `bind_car_policy()` is a no-op it inherits.

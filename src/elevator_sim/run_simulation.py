@@ -9,16 +9,25 @@ outputs/<scheduler>_<car_policy>_<scenario>/.
 import argparse
 import os
 
+from elevator_sim.car_policies.bounded_detour import BoundedDetourPolicy
 from elevator_sim.car_policies.look import LookPolicy
 from elevator_sim.car_policies.scan import ScanPolicy
 from elevator_sim.core import io, metrics
 from elevator_sim.core.engine import Simulation
 from elevator_sim.core.models import Building, Elevator
+from elevator_sim.schedulers.destination_dispatch import DestinationDispatchScheduler
 from elevator_sim.schedulers.round_robin import RoundRobinScheduler
 
 # More scheduler/policy choices get added here as those files get implemented.
-SCHEDULERS = {"round_robin": RoundRobinScheduler}
-CAR_POLICIES = {"scan": ScanPolicy, "look": LookPolicy}
+SCHEDULERS = {
+    "round_robin": RoundRobinScheduler,
+    "destination_dispatch": DestinationDispatchScheduler,
+}
+CAR_POLICIES = {
+    "scan": ScanPolicy,
+    "look": LookPolicy,
+    "bounded_detour": BoundedDetourPolicy,
+}
 
 
 def main():

@@ -32,13 +32,55 @@ signal (see `outputs/runs/README.md`'s `estimate_drift`).
   stride-based `serviceable_floors` subset; see the module docstring for the
   eligibility/fallback rule and its no-transfer limitation. `run_simulation.py`'s
   `SCHEDULERS` registry doesn't build express fleets yet — that's a separate pass.
+  Note that `destination_dispatch` treats the fleet as homogeneous and does not consult
+  `serviceable_floors`, so the two shouldn't be combined without teaching it that rule.
+
+- **`destination_dispatch.py`** (implemented, wired into the CLI) — the cost-aware
+  scheduler, and the only one that actually uses the destination the passenger gave at
+  request time. Scores every candidate car on three exact quantities from
+  `core/trip_estimator.py` and takes the cheapest:
+
+  ```
+  cost = W_WAIT     * ticks_to_pickup                        how long this passenger waits
+       + W_TRAVEL   * (ticks_to_dropoff - ticks_to_pickup)   how long they then ride
+       + W_FAIRNESS * delta_imposed_on_existing              what it costs everyone else
+  ```
+
+  The third term is what destination knowledge buys: a trip that fits inside a sweep a
+  car is already committed to costs nobody anything, while one that pushes that car's
+  reversal point further out makes everyone waiting behind it wait longer — and you
+  cannot tell those apart without knowing where the passenger is going.
+
+  Two structural details worth knowing before editing it:
+
+  - It keeps a **pledge ledger**. `core/engine.py` only adds a destination to a car's
+    `stop_queue` at *boarding*, so a lobby car with eight people assigned and none
+    aboard reads as completely idle. The ledger holds promised-but-not-yet-handed-over
+    destinations and is pruned from observable car state alone, so it cannot drift.
+  - It assigns a whole tick's requests as a **batch** (`assign_batch`, see `base.py`),
+    because simultaneous requests interact: committing one to a car changes what the
+    next one costs there. Free (non-extending) requests are committed straight away,
+    then the rest go by cheapest insertion — repeatedly commit the single cheapest
+    (request, car) pair available right now and re-score what is left against the state
+    that produced. A batch of one reduces to plain "pick the cheapest car", which is
+    exactly what `assign()` promises.
+
+  Unlike `round_robin`, its `estimated_wait_time` is a real ETA rather than a distance
+  guess, which is what finally makes `estimate_drift` (see `outputs/runs/README.md`)
+  measure something: on `sample_full_day` at 4 cars / capacity 8 it drops from
+  `round_robin`+`look`'s avg 5.4 / max 50 to avg 0.1 / max 2. See
+  [`docs/destination_dispatch.html`](../../../docs/destination_dispatch.html) for a
+  visual walkthrough.
 
 - **`zone_based.py`** (stub) — bonus algorithm, not yet implemented. See its header
   comment for the intended design.
 
-## Not implemented yet: a cost/lookahead-aware scheduler
+## Coupling with car policies
 
-`round_robin` is the only implemented scheduler so far, and it's deliberately naive —
-not meant to be the final "intelligent" scheduler for this project. A lookahead/cost-aware
-scheduler that accounts for an elevator's actual position, committed stops, and
-capacity is being designed separately and isn't started yet.
+Most schedulers here are independent of how cars move. `destination_dispatch` is not,
+and cannot be: its estimates are only exact if it knows where a car reverses, and that
+is the car policy's rule. `core/engine.py` hands the active policy to the scheduler via
+`Scheduler.bind_car_policy()` (a no-op on the ABC, so the naive schedulers are
+unaffected), and the scheduler reads two things off it — the policy's
+`reversal_geometry`, and, if the policy offers one, its `detour_limits()`. Both are
+duck-typed, so no scheduler imports any car policy.

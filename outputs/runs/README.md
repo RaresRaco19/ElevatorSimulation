@@ -42,12 +42,18 @@ here, since any of these can be (and have been) regenerated with different value
   slightly worse here despite `look`'s usually-shorter routes, since this scenario's
   mid-service reversal-forcing requests interact differently with `look`'s earlier
   turnarounds than with `scan`'s full sweeps.
-- **`round_robin_scan_stress/`** — `sample_stress.csv` with `round_robin` + `scan`.
-  Shows round_robin's naive estimate diverging sharply from actual wait time for two
-  passengers whose assigned elevator was already busy running the far end of a
-  true-SCAN sweep.
-- **`round_robin_look_stress/`** — same scenario/input as `round_robin_scan_stress/`,
-  swapping in `look` for `scan`. Direct evidence of `scan.py`'s wasted-sweep cost:
-  max wait time drops from 90 to 54 and `estimate_drift` (avg) from 6.8 to 0.8 ticks
-  versus the sibling `scan` run — same requests, same elevators, only the reversal
-  rule differs.
+- **`destination_dispatch_look_full_day/`** — same scenario, input and configuration as
+  the two runs above (`sample_full_day.csv`, 4 cars, capacity 8), swapping
+  `round_robin` for `destination_dispatch` so the scheduler is the only variable. Avg
+  wait 4.9 ticks against `round_robin`+`look`'s 13.3, max 30 against 53. The
+  `estimate_drift` contrast is the sharper one — avg 0.1 / max 2 against avg 5.4 /
+  max 50 — because this scheduler's `estimated_wait_time` is a computed arrival rather
+  than a distance guess.
+- **`destination_dispatch_bounded_detour_full_day/`** — same again, now swapping `look`
+  for `bounded_detour` so the *car policy* is the only variable. Avg wait 4.0 ticks, and
+  max wait drops from 30 to 19: the tail is where letting a car turn back for a stop it
+  has just passed actually pays, which is what that policy exists for.
+
+The remaining folders are `round_robin` with each of `scan` and `look` over
+`sample_capacity_overload`, `sample_downpeak_highrise40` and
+`sample_full_day_skyscraper50`.

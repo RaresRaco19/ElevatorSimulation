@@ -1,14 +1,38 @@
 # TODO: one test class per scheduler in src/elevator_sim/schedulers/
 # (round_robin, zone_based, express) — each should at minimum verify
 # every request submitted ends up served (assignment's "no indefinite wait" requirement).
+#
+# Done so far: round_robin, express, destination_dispatch. zone_based still owes a class.
 
 from collections import Counter
+from pathlib import Path
 
 import pytest
 
-from elevator_sim.core.models import Elevator, Request
+from elevator_sim.car_policies.bounded_detour import BoundedDetourPolicy
+from elevator_sim.car_policies.look import LookPolicy
+from elevator_sim.car_policies.scan import ScanPolicy
+from elevator_sim.core import io, metrics
+from elevator_sim.core import trip_estimator as te
+from elevator_sim.core.engine import Simulation
+from elevator_sim.core.models import Building, Direction, Elevator, Passenger, Request
+from elevator_sim.schedulers import destination_dispatch as dd
+from elevator_sim.schedulers.destination_dispatch import DestinationDispatchScheduler
 from elevator_sim.schedulers.express import ExpressScheduler, NoEligibleElevatorError, express_floor_set
 from elevator_sim.schedulers.round_robin import RoundRobinScheduler
+
+ROOT = Path(__file__).resolve().parents[1]
+FLOORS = 20
+
+# (floors, elevators, capacity) per scenario, matching data/requests/README.md's
+# recommended configuration for each.
+DD_SCENARIOS = {
+    "sample_full_day.csv": (35, 4, 8),
+    "sample_uppeak_highrise30.csv": (30, 4, 10),
+    "sample_downpeak_highrise40.csv": (40, 5, 10),
+    "sample_capacity_overload.csv": (15, 2, 4),
+    "sample_single_elevator_bottleneck.csv": (15, 1, 6),
+}
 
 
 def _elevators(n, capacity):
@@ -209,3 +233,224 @@ class TestExpressScheduler:
             elevator_id, _ = scheduler.assign(request, elevators, current_time=0, floors=16)
             elevator = next(e for e in elevators if e.id == elevator_id)
             assert ExpressScheduler._can_serve(elevator, request)
+
+
+def _dispatcher(car_policy=None):
+    scheduler = DestinationDispatchScheduler()
+    if car_policy is not None:
+        scheduler.bind_car_policy(car_policy)
+    return scheduler
+
+
+def _car(elevator_id, floor, *, direction=Direction.IDLE, stops=(), capacity=8, onboard=()):
+    return Elevator(
+        id=elevator_id,
+        current_floor=floor,
+        capacity=capacity,
+        direction=direction,
+        onboard=list(onboard),
+        stop_queue=set(stops),
+    )
+
+
+def _cost_of(elevator, request, floors=FLOORS):
+    """The cost function applied from outside the scheduler, for cross-checking which
+    car it picks."""
+    state = te.CarState(
+        id=elevator.id,
+        floor=elevator.current_floor,
+        direction=elevator.direction,
+        stops=frozenset(elevator.stop_queue),
+        load=len(elevator.onboard),
+        capacity=elevator.capacity,
+        floors=floors,
+    )
+    result = te.evaluate_insertion(state, request.source, request.dest)
+    return (
+        dd.W_WAIT * result.ticks_to_pickup
+        + dd.W_TRAVEL * (result.ticks_to_dropoff - result.ticks_to_pickup)
+        + dd.W_FAIRNESS * result.delta_imposed_on_existing
+    )
+
+
+class TestDestinationDispatchScheduler:
+    def test_single_request_goes_to_the_minimum_cost_car(self):
+        """A batch of one has to reduce to plain argmin over the cost function -- the
+        invariant that keeps assign() and assign_batch() from drifting apart."""
+        elevators = [
+            _car("E1", 2, direction=Direction.UP, stops=(15,)),
+            _car("E2", 9, direction=Direction.DOWN, stops=(4,)),
+            _car("E3", 18),
+        ]
+        request = Request(time=0, id="R1", source=6, dest=11)
+
+        chosen, _ = _dispatcher(LookPolicy()).assign(request, elevators, 0, FLOORS)
+
+        costs = {e.id: _cost_of(e, request) for e in elevators}
+        assert chosen == min(costs, key=lambda elevator_id: costs[elevator_id])
+
+    def test_batch_of_one_matches_the_single_request_path(self):
+        request = Request(time=0, id="R1", source=6, dest=11)
+
+        def fleet():
+            return [
+                _car("E1", 2, direction=Direction.UP, stops=(15,)),
+                _car("E2", 9, direction=Direction.DOWN, stops=(4,)),
+            ]
+
+        single = _dispatcher(LookPolicy()).assign(request, fleet(), 0, FLOORS)
+        batched = _dispatcher(LookPolicy()).assign_batch([request], fleet(), 0, FLOORS)
+
+        assert batched == {request.id: single}
+
+    def test_prefers_a_car_whose_sweep_already_covers_the_trip(self):
+        """E2 stands nearer the pickup, but taking the trip drags its sweep out past 8
+        and makes the stop at 1 behind it wait; E1 already runs to 10, so the same trip
+        costs nobody anything. Only a scheduler that knows the destination up front can
+        tell those two apart."""
+        elevators = [
+            _car("E1", 3, direction=Direction.UP, stops=(10,)),
+            _car("E2", 4, direction=Direction.UP, stops=(1, 6)),
+        ]
+
+        chosen, _ = _dispatcher(LookPolicy()).assign(
+            Request(time=0, id="R1", source=5, dest=8), elevators, 0, FLOORS
+        )
+
+        assert chosen == "E1"
+
+    def test_skips_a_car_that_is_already_full(self):
+        aboard = [
+            Passenger(request=Request(time=0, id=f"X{i}", source=5, dest=9)) for i in range(2)
+        ]
+        elevators = [
+            _car("E1", 5, capacity=2, onboard=aboard, stops=(9,)),  # sitting on the pickup
+            _car("E2", 12, capacity=2),
+        ]
+
+        chosen, _ = _dispatcher(LookPolicy()).assign(
+            Request(time=0, id="R1", source=5, dest=9), elevators, 0, FLOORS
+        )
+
+        assert chosen == "E2"
+
+    def test_a_pledged_destination_counts_toward_a_car_load(self):
+        """core/engine.py only puts a destination in stop_queue at boarding, so without
+        the ledger a car with every seat promised but nobody aboard still reads as
+        empty -- and an up-peak burst piles onto one car."""
+        scheduler = _dispatcher(LookPolicy())
+        elevators = [_car("E1", 1, capacity=1), _car("E2", 1, capacity=1)]
+        first_request = Request(time=0, id="R1", source=1, dest=15)
+
+        first, _ = scheduler.assign(first_request, elevators, 0, FLOORS)
+        elevators[0].stop_queue.add(first_request.source)  # what the engine does next
+
+        second, _ = scheduler.assign(
+            Request(time=1, id="R2", source=1, dest=16), elevators, 1, FLOORS
+        )
+
+        assert first == "E1"
+        assert second == "E2"
+
+    def test_a_pledged_destination_is_visible_to_the_next_estimate(self):
+        scheduler = _dispatcher(LookPolicy())
+        car = _car("E1", 1)
+        scheduler.assign(Request(time=0, id="R1", source=1, dest=15), [car], 0, FLOORS)
+        car.stop_queue.add(1)
+
+        assert 15 in scheduler._car_state(car, FLOORS).stops
+
+    def test_a_pledge_is_retired_once_the_passenger_boards(self):
+        scheduler = _dispatcher(LookPolicy())
+        request = Request(time=0, id="R1", source=1, dest=15)
+        car = _car("E1", 1, capacity=4)
+        scheduler.assign(request, [car], 0, FLOORS)
+        car.stop_queue.add(1)
+
+        assert scheduler._car_state(car, FLOORS).load == 1
+
+        # The engine boards the passenger: the destination joins stop_queue, the source
+        # leaves it. The pledge has to retire, or the car is counted as carrying two.
+        car.onboard.append(Passenger(request=request))
+        car.stop_queue = {15}
+        scheduler._prune_pledges([car])
+
+        assert scheduler._car_state(car, FLOORS).load == 1
+        assert scheduler._car_state(car, FLOORS).stops == frozenset({15})
+
+    def test_same_tick_batch_accounts_for_its_own_commitments(self):
+        """Two simultaneous requests must not both be scored against the same untouched
+        car: committing the first one changes what the second costs."""
+        elevators = [_car("E1", 1, capacity=1), _car("E2", 1, capacity=1)]
+        requests = [
+            Request(time=0, id="R1", source=1, dest=15),
+            Request(time=0, id="R2", source=1, dest=16),
+        ]
+
+        decisions = _dispatcher(LookPolicy()).assign_batch(requests, elevators, 0, FLOORS)
+
+        assert {elevator_id for elevator_id, _ in decisions.values()} == {"E1", "E2"}
+        assert set(decisions) == {"R1", "R2"}
+
+    def test_estimate_follows_the_bound_policy_reversal_rule(self):
+        """The same car and the same request, priced against two movement rules: LOOK
+        turns at its last stop, SCAN runs to the top of the building first."""
+        elevators = [_car("E1", 5, direction=Direction.UP, stops=(9,))]
+        request = Request(time=0, id="R1", source=3, dest=1)
+
+        _, look_eta = _dispatcher(LookPolicy()).assign(request, elevators, 0, FLOORS)
+        _, scan_eta = _dispatcher(ScanPolicy()).assign(request, elevators, 0, FLOORS)
+
+        assert look_eta == 2 * 9 - 5 - 3
+        assert scan_eta == 2 * FLOORS - 5 - 3
+
+    def test_prices_a_detour_capable_car_at_the_detour_cost(self):
+        """Integration point 2. Without it the dispatcher assumes every pickup behind a
+        car must wait out a full reversal, and so systematically passes over exactly the
+        cars best placed to take it."""
+        elevators = [_car("E1", 5, direction=Direction.UP, stops=(9,))]
+        request = Request(time=0, id="R1", source=3, dest=1)
+
+        _, look_eta = _dispatcher(LookPolicy()).assign(request, elevators, 0, FLOORS)
+        _, detour_eta = _dispatcher(BoundedDetourPolicy()).assign(request, elevators, 0, FLOORS)
+
+        assert look_eta == 10  # out to the reversal at 9, then back down to 3
+        assert detour_eta == 2  # turn back now
+
+    @pytest.mark.parametrize("scenario", sorted(DD_SCENARIOS))
+    @pytest.mark.parametrize("policy", [ScanPolicy, LookPolicy, BoundedDetourPolicy])
+    def test_every_request_is_served_under_every_car_policy(self, scenario, policy):
+        """The assignment's "no indefinite wait" requirement, end to end."""
+        floors, cars, capacity = DD_SCENARIOS[scenario]
+        requests = io.load_requests(ROOT / "data" / "requests" / scenario)
+        building = Building(
+            floors=floors,
+            elevators=[
+                Elevator(id=f"E{i + 1}", current_floor=1, capacity=capacity) for i in range(cars)
+            ],
+        )
+
+        passengers, _ = Simulation(
+            building, requests, DestinationDispatchScheduler(), policy()
+        ).run()
+
+        assert len(passengers) == len(requests)
+        assert all(p.dropoff_time is not None for p in passengers)
+        assert all(p.pickup_time >= p.request.time for p in passengers)
+
+    def test_estimates_are_more_accurate_than_the_naive_distance_guess(self):
+        """estimated_wait_time is the scheduler's own promise (see
+        outputs/runs/README.md's estimate_drift). round_robin guesses plain distance;
+        this one computes the arrival it actually expects, so the gap should shrink
+        sharply on the same scenario."""
+        requests = io.load_requests(ROOT / "data" / "requests" / "sample_full_day.csv")
+
+        def drift(scheduler):
+            building = Building(
+                floors=35,
+                elevators=[Elevator(id=f"E{i + 1}", current_floor=1, capacity=8) for i in range(4)],
+            )
+            passengers, _ = Simulation(building, requests, scheduler, LookPolicy()).run()
+            return metrics.compute_passenger_stats(passengers)["estimate_drift"]["avg"]
+
+        assert drift(DestinationDispatchScheduler()) < drift(RoundRobinScheduler())

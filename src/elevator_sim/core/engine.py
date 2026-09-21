@@ -14,6 +14,9 @@ class Simulation:
         self.building = building
         self.scheduler = scheduler
         self.car_policy = car_policy
+        # Schedulers that estimate travel time need to know how cars actually move --
+        # where they reverse, and whether they may detour. Naive ones ignore this.
+        scheduler.bind_car_policy(car_policy)
         self.passengers = [Passenger(request=r) for r in sorted(requests, key=lambda r: r.time)]
         self.position_log: list[dict] = []
         self.tick = 0
@@ -22,15 +25,27 @@ class Simulation:
         return next(e for e in self.building.elevators if e.id == elevator_id)
 
     def _release_and_assign(self):
-        for p in self.passengers:
-            if p.request.time <= self.tick and p.assigned_elevator is None:
-                elevator_id, estimated_wait_time = self.scheduler.assign(
-                    p.request, self.building.elevators, self.tick, self.building.floors
-                )
-                elevator = self._elevator_by_id(elevator_id)
-                p.assigned_elevator = elevator_id
-                p.estimated_wait_time = estimated_wait_time
-                elevator.stop_queue.add(p.request.source)
+        # Hand the scheduler the whole tick's worth of requests at once rather than one
+        # at a time: requests arriving together interact, and a scheduler can only
+        # account for that if it can see them together. The Scheduler ABC's default
+        # assign_batch falls back to in-order per-request assign() calls, so schedulers
+        # that don't care behave exactly as they did before.
+        due = [
+            p for p in self.passengers
+            if p.request.time <= self.tick and p.assigned_elevator is None
+        ]
+        if not due:
+            return
+
+        decisions = self.scheduler.assign_batch(
+            [p.request for p in due], self.building.elevators, self.tick, self.building.floors
+        )
+        for p in due:
+            elevator_id, estimated_wait_time = decisions[p.request.id]
+            elevator = self._elevator_by_id(elevator_id)
+            p.assigned_elevator = elevator_id
+            p.estimated_wait_time = estimated_wait_time
+            elevator.stop_queue.add(p.request.source)
 
     def _board_and_dropoff(self, elevator):
         floor = elevator.current_floor

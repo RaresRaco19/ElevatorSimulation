@@ -24,6 +24,16 @@ it has work (that's `car_policies/`) — `core/` owns everything else.
   I/O) producing the aggregate stats dict (`count`, `wait_time`/`total_time`
   min/max/avg, `estimate_drift`) that `io.write_passenger_stats` serializes.
 
+- **`trip_estimator.py`** — closed-form trip arithmetic (`extent`, `ticks`,
+  `evaluate_insertion`, `detour_eligible`), pure and importable by both `schedulers/`
+  and `car_policies/` without coupling them to each other. Zero dwell time makes travel
+  time pure geometry, so these are exact answers rather than estimates-in-the-loose-sense
+  — no simulated run per candidate. `turn_point()` takes the reversal rule as a
+  parameter (`LOOK` vs `SCAN`), which is what keeps one formula correct for both car
+  policies. Used by `schedulers/destination_dispatch.py` to score candidate cars and by
+  `car_policies/bounded_detour.py` to decide whether a diversion is allowed, so dispatch
+  and movement cannot disagree about what a car will do.
+
 - **`io.py`** — the schema boundary: `load_requests` parses input CSVs;
   `write_positions_log` / `write_requests_copy` / `write_passenger_log` /
   `write_passenger_stats` / `write_run_config` write a run's output folder. Nothing

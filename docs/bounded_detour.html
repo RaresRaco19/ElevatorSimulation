@@ -1,0 +1,211 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Bounded Detour Car Policy</title>
+<style>
+  :root {
+    --bg: #fbfaf8;
+    --panel: #ffffff;
+    --border: #e3ded6;
+    --text: #2a2724;
+    --muted: #6b655d;
+    --accent: #b5622f;
+    --accent-soft: #f1e2d6;
+    --car: #5a7a8c;
+    --car-soft: #dfe9ed;
+    --mono-bg: #f3efe8;
+    color-scheme: light dark;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1c1a18;
+      --panel: #26221f;
+      --border: #3a3530;
+      --text: #ece7e0;
+      --muted: #a89f93;
+      --accent: #e08a52;
+      --accent-soft: #3a2c22;
+      --car: #8fb4c7;
+      --car-soft: #26343b;
+      --mono-bg: #2c2825;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font: 15px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  }
+  main {
+    max-width: 760px;
+    margin: 0 auto;
+    padding: 40px 20px 64px;
+  }
+  h1 {
+    font-size: 1.55rem;
+    margin: 0 0 4px;
+    letter-spacing: -0.01em;
+  }
+  .tagline {
+    color: var(--muted);
+    margin: 0 0 32px;
+    font-size: 0.98rem;
+  }
+  h2 {
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--accent);
+    margin: 0 0 12px;
+  }
+  section { margin-bottom: 34px; }
+  ul { margin: 0; padding-left: 1.1em; }
+  li { margin-bottom: 7px; }
+  li:last-child { margin-bottom: 0; }
+  code {
+    background: var(--mono-bg);
+    border-radius: 4px;
+    padding: 0.1em 0.35em;
+    font-size: 0.88em;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 18px 20px;
+  }
+  .callout {
+    background: var(--accent-soft);
+    border-radius: 10px;
+    padding: 14px 18px;
+    font-size: 0.94rem;
+  }
+  .callout code { background: rgba(0,0,0,0.08); }
+  @media (prefers-color-scheme: dark) { .callout code { background: rgba(255,255,255,0.1); } }
+  svg { width: 100%; height: auto; display: block; }
+  .diagram-caption {
+    color: var(--muted);
+    font-size: 0.82rem;
+    margin-top: 8px;
+  }
+  footer {
+    margin-top: 40px;
+    color: var(--muted);
+    font-size: 0.82rem;
+    border-top: 1px solid var(--border);
+    padding-top: 14px;
+  }
+</style>
+</head>
+<body>
+<main>
+  <h1>Bounded Detour Car Policy</h1>
+  <p class="tagline">LOOK, but it may turn back once &mdash; within hard bounds &mdash; <code>src/elevator_sim/car_policies/bounded_detour.py</code></p>
+
+  <section>
+    <h2>The problem it fixes</h2>
+    <ul>
+      <li><strong>LOOK is unfair to whoever it just passed.</strong> Press the button one floor behind a rising car and you wait out its entire remaining climb <em>and</em> the trip back down &mdash; however close the car actually is right now.</li>
+      <li><strong>Reversing freely is worse.</strong> A policy that turns back whenever someone is nearer behind it (<code>fcfs</code>-style) thrashes, and the passengers already aboard pay for every reversal with no ceiling on the damage.</li>
+      <li><strong>So: turn back, but bound it.</strong> A car mid-sweep may divert to one stop it has already passed and then resume exactly where it left off &mdash; only if all three bounds below allow it.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>The three bounds</h2>
+    <div class="panel">
+      <ul>
+        <li><strong><code>D</code> &mdash; <code>MAX_DETOUR_DISTANCE</code>.</strong> How far back the car may divert from where it stands.</li>
+        <li><strong><code>k</code> &mdash; <code>MAX_DETOURS_PER_SWEEP</code>.</strong> How many diversions one sweep may spend. The budget refreshes on a natural reversal, not on a timer.</li>
+        <li><strong><code>F</code> &mdash; <code>MAX_FAIRNESS_DELAY</code>.</strong> How much a single diversion may delay the passengers already aboard.</li>
+      </ul>
+    </div>
+    <p class="diagram-caption">Together these bound the worst case at exactly <code>k &times; 2D</code> extra ticks per sweep for everyone aboard. That is a guarantee rather than a tendency, because every quantity involved is exact rather than sampled &mdash; and <code>tests/test_car_policies.py</code> checks it against a plain LOOK baseline on the same queue.</p>
+  </section>
+
+  <section>
+    <h2>Diagram</h2>
+    <div class="panel">
+      <svg viewBox="0 0 720 255" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Bounded detour trajectory: a rising car at floor 4 turns back one floor to serve a stop at floor 3, then resumes its climb to floor 6, compared against a dashed plain-LOOK path that finishes the climb first">
+        <!-- floor gridlines + labels, floors 1-6 -->
+        <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="11" fill="var(--muted)">
+          <line x1="60" y1="40"  x2="640" y2="40"  stroke="var(--border)"></line>
+          <text x="48" y="44" text-anchor="end">6</text>
+          <line x1="60" y1="70"  x2="640" y2="70"  stroke="var(--border)"></line>
+          <text x="48" y="74" text-anchor="end">5</text>
+          <line x1="60" y1="100" x2="640" y2="100" stroke="var(--border)"></line>
+          <text x="48" y="104" text-anchor="end">4</text>
+          <line x1="60" y1="130" x2="640" y2="130" stroke="var(--border)"></line>
+          <text x="48" y="134" text-anchor="end">3</text>
+          <line x1="60" y1="160" x2="640" y2="160" stroke="var(--border)"></line>
+          <text x="48" y="164" text-anchor="end">2</text>
+          <line x1="60" y1="190" x2="640" y2="190" stroke="var(--border)"></line>
+          <text x="48" y="194" text-anchor="end">1</text>
+          <text x="10" y="18" fill="var(--accent)" font-size="12">FLOOR</text>
+        </g>
+
+        <!-- ghost path: plain look.py finishes the climb to 6 first, then comes back down to 3 -->
+        <polyline points="60,100 176,40 350,130" fill="none" stroke="var(--muted)" stroke-width="2" stroke-dasharray="5,4" opacity="0.7"></polyline>
+        <text x="430" y="70" font-size="11" fill="var(--muted)" font-family="ui-monospace, Menlo, Consolas, monospace">plain look.py finishes the climb first (dashed)</text>
+
+        <!-- bounded detour: 4 -> 3 -> back to 4 -> on up to 6 -->
+        <polyline points="60,100 118,130 176,100 292,40" fill="none" stroke="var(--car)" stroke-width="2.5"></polyline>
+
+        <!-- the diverted stop, and the committed stop at the far end of the sweep -->
+        <circle cx="118" cy="130" r="5" fill="var(--accent)"></circle>
+        <circle cx="292" cy="40"  r="5" fill="var(--accent)"></circle>
+        <text x="118" y="150" text-anchor="middle" font-size="11" fill="var(--accent)" font-family="ui-monospace, Menlo, Consolas, monospace">diverted stop</text>
+
+        <!-- what it costs those already aboard: floor 6 arrives at t4 instead of t2 -->
+        <line x1="176" y1="26" x2="292" y2="26" stroke="var(--accent)" stroke-width="1.5"></line>
+        <line x1="176" y1="21" x2="176" y2="31" stroke="var(--accent)" stroke-width="1.5"></line>
+        <line x1="292" y1="21" x2="292" y2="31" stroke="var(--accent)" stroke-width="1.5"></line>
+        <text x="302" y="30" font-size="11" fill="var(--accent)" font-family="ui-monospace, Menlo, Consolas, monospace">floor 6 arrives 2 ticks late = 2 &times; |4 &minus; 3|</text>
+
+        <!-- what it buys: the stop at floor 3 is served at t1 instead of t5 -->
+        <line x1="118" y1="208" x2="350" y2="208" stroke="var(--accent)" stroke-width="1.5"></line>
+        <line x1="118" y1="203" x2="118" y2="213" stroke="var(--accent)" stroke-width="1.5"></line>
+        <line x1="350" y1="203" x2="350" y2="213" stroke="var(--accent)" stroke-width="1.5"></line>
+        <text x="234" y="226" text-anchor="middle" font-size="11" fill="var(--accent)" font-family="ui-monospace, Menlo, Consolas, monospace">floor 3 served 4 ticks sooner</text>
+
+        <!-- time axis -->
+        <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="11" fill="var(--muted)">
+          <text x="60"  y="248" text-anchor="middle">t0</text>
+          <text x="118" y="248" text-anchor="middle">t1</text>
+          <text x="176" y="248" text-anchor="middle">t2</text>
+          <text x="292" y="248" text-anchor="middle">t4</text>
+          <text x="350" y="248" text-anchor="middle">t5</text>
+        </g>
+      </svg>
+      <p class="diagram-caption">A car at floor 4 climbing to a committed stop at floor 6, when a stop at floor 3 &mdash; one floor behind it &mdash; joins its queue. The diversion is one floor, so it costs everyone aboard exactly <code>2 &times; 1 = 2</code> ticks, and buys the passenger at floor 3 a pickup four ticks sooner. Plain LOOK (dashed) would reach floor 6 two ticks earlier but leave floor 3 waiting until t5.</p>
+    </div>
+  </section>
+
+  <section>
+    <h2>Why one check covers every passenger</h2>
+    <p>A diversion is not a new kind of motion &mdash; it is a sweep extension that snaps back instead of persisting. Once the car returns to where it turned, it resumes the exact trajectory it would have taken anyway, with the diverted stop now cleared. So the surcharge is <em>flat</em>: every remaining stop is pushed back by the same <code>2 &times; distance</code>, no matter where it sits.</p>
+    <p class="callout">That is why the fairness bound is a single scalar comparison rather than a loop over everyone aboard &mdash; with zero dwell time, checking <code>F</code> once checks it for all of them. The claim is load-bearing, so <code>tests/test_trip_estimator.py</code> verifies it against a brute-force per-passenger comparison instead of assuming it. (A <em>relative</em> bound &mdash; a percentage of each passenger's own remaining trip &mdash; would bring the per-passenger loop back, since those differ.)</p>
+  </section>
+
+  <section>
+    <h2>Where the arithmetic lives</h2>
+    <ul>
+      <li><strong>None of it is in this file.</strong> Whether a diversion is allowed is <code>trip_estimator.detour_eligible()</code>; where the sweep goes otherwise is <code>look.look_direction()</code>. This policy contributes control flow only.</li>
+      <li><strong>Which matters because the dispatcher asks the same questions.</strong> <code>schedulers/destination_dispatch.py</code> calls <code>detour_eligible()</code> too, through this policy's <code>detour_limits()</code> &mdash; so what a car actually does and what the scheduler predicted it would do are derived from one function and cannot drift apart.</li>
+      <li><strong>The car cannot remember its own sweep.</strong> <code>core/engine.py</code> overwrites <code>Elevator.direction</code> with whatever the policy last returned, so the instant a car turns back, the elevator itself no longer knows which way it was going. The policy keeps that in its own per-car state and restores it on the way out.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>Measured effect</h2>
+    <p class="callout">Its effect is mostly on the <em>tail</em>, which is what it is for. On <code>sample_full_day.csv</code> at 4 cars and capacity 8, with <code>destination_dispatch</code>: max wait drops from 30 to 19 ticks against <code>look</code>, average wait from 4.9 to 4.0 &mdash; same requests, same cars, only the reversal rule differs. Compare <code>outputs/runs/destination_dispatch_look_full_day/</code> against <code>outputs/runs/destination_dispatch_bounded_detour_full_day/</code>.</p>
+  </section>
+
+  <footer>See <code>src/elevator_sim/car_policies/bounded_detour.py</code> and <code>src/elevator_sim/car_policies/README.md</code> for the implementation and fuller policy comparison; <code>docs/look.html</code> for the policy it extends.</footer>
+</main>
+</body>
+</html>

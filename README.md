@@ -11,28 +11,31 @@ time until every request is served.
 - `src/elevator_sim/core/` — the simulation engine, data model, and I/O. See
   [`core/README.md`](src/elevator_sim/core/README.md).
 - `src/elevator_sim/schedulers/` — pluggable "which elevator handles this request"
-  algorithms: `round_robin.py` is implemented; `express.py` and
-  `zone_based.py` are stubs. See [`schedulers/README.md`](src/elevator_sim/schedulers/README.md)
-  and, for a concise visual walkthrough of the round-robin algorithm,
-  [`docs/round_robin.html`](docs/round_robin.html).
+  algorithms: `round_robin.py` and `destination_dispatch.py` are implemented and wired
+  into the CLI, `express.py` is implemented but not wired in, and `zone_based.py` is a
+  stub. See [`schedulers/README.md`](src/elevator_sim/schedulers/README.md) and, for
+  concise visual walkthroughs,
+  [`docs/round_robin.html`](docs/round_robin.html) and
+  [`docs/destination_dispatch.html`](docs/destination_dispatch.html).
 - `src/elevator_sim/car_policies/` — pluggable "how does an already-assigned car move"
-  algorithms: `scan.py` and `look.py` are implemented and wired into the CLI; `fcfs.py`
-  is a stub. See
+  algorithms: `scan.py`, `look.py` and `bounded_detour.py` are implemented and wired
+  into the CLI; `fcfs.py` is a stub. See
   [`car_policies/README.md`](src/elevator_sim/car_policies/README.md) and, for concise
-  visual walkthroughs, [`docs/scan.html`](docs/scan.html) and
-  [`docs/look.html`](docs/look.html).
+  visual walkthroughs, [`docs/scan.html`](docs/scan.html),
+  [`docs/look.html`](docs/look.html) and
+  [`docs/bounded_detour.html`](docs/bounded_detour.html).
 - `src/elevator_sim/run_simulation.py` — the CLI entrypoint that wires the above
   together.
 - `data/requests/` — sample input request CSVs. See
   [`data/requests/README.md`](data/requests/README.md).
 - `outputs/` — generated run outputs; `outputs/runs/` holds a curated, committed
   set for reviewers. See [`outputs/runs/README.md`](outputs/runs/README.md).
-- `analysis/` — scripts that turn run outputs into charts (still TODO stubs). See
+- `analysis/` — scripts that turn run outputs into charts. See
   [`analysis/README.md`](analysis/README.md).
 - `ui/` — static web app that replays a run's elevator movement tick by tick. See
   [`ui/README.md`](ui/README.md).
-- `tests/` — unit tests for the engine, schedulers, and car policies (still TODO
-  stubs, nothing runnable yet). See [`tests/README.md`](tests/README.md).
+- `tests/` — unit tests for the trip estimator, schedulers, and car policies
+  (`test_engine.py` is still a TODO stub). See [`tests/README.md`](tests/README.md).
 
 ## How to run
 
@@ -69,8 +72,8 @@ Currently available flag values:
 
 | Flag | Choices | Notes |
 | --- | --- | --- |
-| `--scheduler` | `round_robin` | `express`, `zone_based` exist as stub files but aren't wired in yet |
-| `--car-policy` | `scan`, `look` | `fcfs` exists as a stub file but isn't wired in yet |
+| `--scheduler` | `round_robin`, `destination_dispatch` | `express` is implemented but not wired in; `zone_based` is a stub |
+| `--car-policy` | `scan`, `look`, `bounded_detour` | `fcfs` exists as a stub file but isn't wired in yet |
 | `--requests` | path to a `time,id,source,dest` CSV | see `data/requests/` |
 | `--elevators`, `--floors`, `--capacity` | integers | building configuration |
 | `--out` | output directory | created if it doesn't exist |
@@ -97,18 +100,25 @@ each.
 
 ### 5. Run the tests
 
-Not runnable yet — `tests/*.py` are currently TODO comments, not test code. Once
-implemented, the intent is:
-
 ```
 PYTHONPATH=src pytest
 ```
 
+On Windows PowerShell, `$env:PYTHONPATH = "src"` first, then `pytest`. See
+[`tests/README.md`](tests/README.md) for what each file covers.
+
 ### 6. Regenerate analysis figures
 
-Also not runnable yet — `analysis/scripts/*.py` are currently TODO comments. The
-output schema they'll read (`passenger_stats.json`, `positions_log.csv`) is already
-finalized, so this is just unwritten plotting code, not a blocked design question.
+```
+python analysis/scripts/run_sweep.py
+python analysis/scripts/compare_schedulers.py
+python analysis/scripts/plot_wait_times.py --aggregate
+```
+
+The sweep runs every scenario across elevators 1-10 x capacity {3, 5, 8, 13} for all six
+(scheduler, car policy) pairs — about 2640 configs in half a minute. See
+[`analysis/README.md`](analysis/README.md) for the full set of commands and what the
+current figures show.
 
 ## Time spent
 
@@ -130,14 +140,31 @@ TODO
   the same direction onto one elevator (so a burst of compatible simultaneous requests
   doesn't needlessly occupy every car), but it otherwise remains fully naive — it has
   no notion of any elevator's actual position, remaining stop queue, or capacity.
+- Zero dwell time is what makes `core/trip_estimator.py` exact rather than approximate:
+  with no door delay, the time to reach any floor is pure geometry, so
+  `schedulers/destination_dispatch.py` can score a candidate car with arithmetic instead
+  of simulating it. Adding a boarding delay would make those closed forms approximations
+  and is the assumption most worth revisiting first.
+- `core/engine.py` only adds a passenger's destination to a car's `stop_queue` at
+  *boarding*, not at assignment, so a car's queue understates what it is committed to.
+  `destination_dispatch` compensates with its own pledge ledger rather than changing the
+  engine, which would have altered every existing run's behaviour.
+- `schedulers/destination_dispatch.py` treats the fleet as homogeneous: it doesn't
+  consult `Elevator.serviceable_floors`, so it shouldn't be paired with an express fleet
+  (that eligibility rule lives in `express.py`).
+- `car_policies/bounded_detour.py`'s three bounds (D, k, F) are module constants rather
+  than CLI flags — they describe how the policy behaves, not what a given run does.
 
 ## What I'd improve with more time
 
-- Implement `look.py` and `fcfs.py` car policies, and a cost/lookahead-aware scheduler
-  that isn't tied to one specific car policy's movement geometry (currently in design).
-- Implement the `zone_based.py` and `express.py` scheduler stubs for a fuller
-  fairness/efficiency comparison.
+- Implement the `fcfs.py` car policy and the `zone_based.py` scheduler stub, and wire
+  `express.py` into the CLI, for a fuller fairness/efficiency comparison.
+- Teach `destination_dispatch` about `serviceable_floors` so it can dispatch a mixed
+  express/regular fleet.
 - Model door/boarding delay, so simultaneous pickups aren't free and capacity
-  constraints bite more realistically.
-- Write the actual unit tests described in `tests/*.py`'s TODO comments.
+  constraints bite more realistically. This is the change that would cost
+  `trip_estimator` its exactness, so it wants doing deliberately.
+- Write `tests/test_engine.py`, the one test file still a TODO comment.
+- Tune `destination_dispatch`'s cost weights empirically — they're currently set by
+  judgement (waiting weighted above riding), not fitted against the sweep.
 - Package the project properly (`pyproject.toml`) so `PYTHONPATH=src` isn't required.

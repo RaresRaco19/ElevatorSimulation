@@ -45,7 +45,14 @@ SCENARIOS = {
 # (scheduler_name, car_policy_name) pairs to sweep -- both must already be wired into
 # run_simulation.py's SCHEDULERS/CAR_POLICIES registries. Extend this list as more
 # schedulers get wired in.
-PAIRS = [("round_robin", "scan"), ("round_robin", "look")]
+PAIRS = [
+    ("round_robin", "scan"),
+    ("round_robin", "look"),
+    ("round_robin", "bounded_detour"),
+    ("destination_dispatch", "scan"),
+    ("destination_dispatch", "look"),
+    ("destination_dispatch", "bounded_detour"),
+]
 
 ELEVATOR_COUNTS = range(1, 11)
 CAPACITIES = [3, 5, 8, 13]

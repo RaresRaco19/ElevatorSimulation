@@ -60,8 +60,11 @@ Each run folder needs:
   `actual_wait_time`/`total_time`/`elevator` (as "Waiting Time"/"Total Time"/"Elevator"
   in the Passenger Times panel) — `estimated_wait_time` is logged and still used for
   `passenger_stats.json`'s `estimate_drift`, but isn't shown in this UI. See
-  `src/elevator_sim/schedulers/README.md` for how it's computed (currently always the
-  naive distance guess from `round_robin`, the only implemented scheduler).
+  `src/elevator_sim/schedulers/README.md` for how it's computed — each scheduler owns
+  its own number, so it means quite different things run to run: `round_robin` reports a
+  naive `|elevator_floor - source|` guess, while `destination_dispatch` reports a real
+  computed arrival. Comparing two runs' `estimate_drift` in the Run Summary's source
+  file is the quickest way to see that difference.
 - `passenger_stats.json` — aggregate over `passenger_log.csv` (`core/metrics.py`'s
   `compute_passenger_stats`): count, `wait_time`/`total_time` `{min, max, avg}`, and
   `estimate_drift`. Rendered once at load into the always-visible Run Summary card.

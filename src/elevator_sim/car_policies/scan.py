@@ -2,11 +2,14 @@
 every committed stop along the way, until reaching floor 1 or the top floor -- then
 reverse, even if no committed stops remain in that direction."""
 
+from elevator_sim.core import trip_estimator
 from elevator_sim.core.models import Direction, Elevator
 from .base import CarMovementPolicy
 
 
 class ScanPolicy(CarMovementPolicy):
+    reversal_geometry = trip_estimator.SCAN
+
     def next_direction(self, elevator: Elevator, current_time: int, floors: int) -> Direction:
         if not elevator.stop_queue:
             return Direction.IDLE

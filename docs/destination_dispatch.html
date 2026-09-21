@@ -1,0 +1,236 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Destination Dispatch Scheduler</title>
+<style>
+  :root {
+    --bg: #fbfaf8;
+    --panel: #ffffff;
+    --border: #e3ded6;
+    --text: #2a2724;
+    --muted: #6b655d;
+    --accent: #b5622f;
+    --accent-soft: #f1e2d6;
+    --car: #5a7a8c;
+    --car-soft: #dfe9ed;
+    --mono-bg: #f3efe8;
+    color-scheme: light dark;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1c1a18;
+      --panel: #26221f;
+      --border: #3a3530;
+      --text: #ece7e0;
+      --muted: #a89f93;
+      --accent: #e08a52;
+      --accent-soft: #3a2c22;
+      --car: #8fb4c7;
+      --car-soft: #26343b;
+      --mono-bg: #2c2825;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font: 15px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  }
+  main {
+    max-width: 760px;
+    margin: 0 auto;
+    padding: 40px 20px 64px;
+  }
+  h1 {
+    font-size: 1.55rem;
+    margin: 0 0 4px;
+    letter-spacing: -0.01em;
+  }
+  .tagline {
+    color: var(--muted);
+    margin: 0 0 32px;
+    font-size: 0.98rem;
+  }
+  h2 {
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--accent);
+    margin: 0 0 12px;
+  }
+  section { margin-bottom: 34px; }
+  ul { margin: 0; padding-left: 1.1em; }
+  li { margin-bottom: 7px; }
+  li:last-child { margin-bottom: 0; }
+  code {
+    background: var(--mono-bg);
+    border-radius: 4px;
+    padding: 0.1em 0.35em;
+    font-size: 0.88em;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 18px 20px;
+  }
+  .callout {
+    background: var(--accent-soft);
+    border-radius: 10px;
+    padding: 14px 18px;
+    font-size: 0.94rem;
+  }
+  .callout code { background: rgba(0,0,0,0.08); }
+  @media (prefers-color-scheme: dark) { .callout code { background: rgba(255,255,255,0.1); } }
+  svg { width: 100%; height: auto; display: block; }
+  .diagram-caption {
+    color: var(--muted);
+    font-size: 0.82rem;
+    margin-top: 8px;
+  }
+  footer {
+    margin-top: 40px;
+    color: var(--muted);
+    font-size: 0.82rem;
+    border-top: 1px solid var(--border);
+    padding-top: 14px;
+  }
+</style>
+</head>
+<body>
+<main>
+  <h1>Destination Dispatch Scheduler</h1>
+  <p class="tagline">The only scheduler here that uses where you said you were going &mdash; <code>src/elevator_sim/schedulers/destination_dispatch.py</code></p>
+
+  <section>
+    <h2>How it works</h2>
+    <ul>
+      <li><strong>Scores three things, takes the cheapest.</strong> How long the new passenger waits, how long they then ride, and what the assignment costs everyone already promised that car.</li>
+      <li><strong>The third term needs the destination.</strong> A trip that fits inside a sweep a car is already committed to costs nobody anything. One that pushes that car's reversal point further out makes everyone waiting behind it wait longer. You cannot tell those apart from the pickup floor alone &mdash; which is the whole reason the other schedulers here cannot.</li>
+      <li><strong>No simulation per candidate.</strong> Every quantity comes from <code>core/trip_estimator.py</code> as closed-form arithmetic. Zero dwell time makes travel time pure geometry, so scoring a car is a handful of additions, not a replayed run.</li>
+      <li><strong>Assigns a whole tick at once.</strong> Simultaneous requests interact, so they are placed by cheapest insertion rather than scored independently.</li>
+      <li><strong>Wait estimate.</strong> The arrival it actually computed &mdash; not a distance guess &mdash; which is what makes <code>estimate_drift</code> meaningful.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>The cost function</h2>
+    <div class="panel">
+      <ul>
+        <li><code>W_WAIT &times; ticks_to_pickup</code> &mdash; how long the new passenger stands at their floor.</li>
+        <li><code>W_TRAVEL &times; (ticks_to_dropoff &minus; ticks_to_pickup)</code> &mdash; how long they then ride.</li>
+        <li><code>W_FAIRNESS &times; delta_imposed_on_existing</code> &mdash; ticks this assignment adds to everyone already committed to that car.</li>
+      </ul>
+    </div>
+    <p class="diagram-caption">Waiting is weighted heaviest: standing at a floor with no information is worse than riding in a car you can see moving. Fairness is weighted level with the new passenger's own ride, so the scheduler will not wreck a committed route to shave a tick off one trip.</p>
+  </section>
+
+  <section>
+    <h2>Diagram</h2>
+    <div class="panel">
+      <svg viewBox="0 0 720 315" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Two candidate cars scored for one 5 to 8 request: E1's committed sweep already spans it, while E2 must extend its sweep and delay a passenger waiting behind it">
+        <text x="0" y="16" font-size="12" fill="var(--muted)" font-family="ui-monospace, Menlo, Consolas, monospace">ONE REQUEST &mdash; 5 &rarr; 8 &mdash; SCORED AGAINST TWO CARS (floor axis, not time)</text>
+
+        <!-- floor gridlines, floors 1-12 at x = 120 + (f-1)*49 -->
+        <g stroke="var(--border)">
+          <line x1="120" y1="40" x2="120" y2="252"></line>
+          <line x1="169" y1="40" x2="169" y2="252"></line>
+          <line x1="218" y1="40" x2="218" y2="252"></line>
+          <line x1="267" y1="40" x2="267" y2="252"></line>
+          <line x1="316" y1="40" x2="316" y2="252"></line>
+          <line x1="365" y1="40" x2="365" y2="252"></line>
+          <line x1="414" y1="40" x2="414" y2="252"></line>
+          <line x1="463" y1="40" x2="463" y2="252"></line>
+          <line x1="512" y1="40" x2="512" y2="252"></line>
+          <line x1="561" y1="40" x2="561" y2="252"></line>
+        </g>
+        <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="11" fill="var(--muted)">
+          <text x="120" y="268" text-anchor="middle">1</text>
+          <text x="169" y="268" text-anchor="middle">2</text>
+          <text x="218" y="268" text-anchor="middle">3</text>
+          <text x="267" y="268" text-anchor="middle">4</text>
+          <text x="316" y="268" text-anchor="middle">5</text>
+          <text x="365" y="268" text-anchor="middle">6</text>
+          <text x="414" y="268" text-anchor="middle">7</text>
+          <text x="463" y="268" text-anchor="middle">8</text>
+          <text x="512" y="268" text-anchor="middle">9</text>
+          <text x="561" y="268" text-anchor="middle">10</text>
+          <text x="0" y="268">FLOOR</text>
+        </g>
+
+        <!-- ===== E1: the trip nests inside a sweep it already runs ===== -->
+        <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="12">
+          <text x="0" y="86" fill="var(--car)" font-size="13">E1</text>
+          <text x="0" y="102" fill="var(--muted)" font-size="11">at 3, up</text>
+
+          <rect x="218" y="74" width="343" height="16" rx="5" fill="var(--car-soft)" stroke="var(--car)"></rect>
+          <text x="389" y="66" text-anchor="middle" font-size="11" fill="var(--car)">committed sweep: 3 &rarr; 10</text>
+          <circle cx="218" cy="82" r="5" fill="var(--car)"></circle>
+
+          <line x1="316" y1="112" x2="463" y2="112" stroke="var(--accent)" stroke-width="3"></line>
+          <circle cx="316" cy="112" r="4" fill="var(--accent)"></circle>
+          <circle cx="463" cy="112" r="4" fill="var(--accent)"></circle>
+          <text x="389" y="130" text-anchor="middle" font-size="11" fill="var(--accent)">nests inside it &mdash; extra_extent 0, delay imposed 0</text>
+        </g>
+
+        <line x1="0" y1="150" x2="720" y2="150" stroke="var(--border)"></line>
+
+        <!-- ===== E2: nearer the pickup, but the trip drags its sweep out ===== -->
+        <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="12">
+          <text x="0" y="196" fill="var(--car)" font-size="13">E2</text>
+          <text x="0" y="212" fill="var(--muted)" font-size="11">at 4, up</text>
+
+          <circle cx="120" cy="192" r="5" fill="var(--muted)"></circle>
+          <text x="120" y="178" text-anchor="middle" font-size="11" fill="var(--muted)">waiting</text>
+
+          <rect x="267" y="184" width="98" height="16" rx="5" fill="var(--car-soft)" stroke="var(--car)"></rect>
+          <text x="316" y="176" text-anchor="middle" font-size="11" fill="var(--car)">sweep: 4 &rarr; 6</text>
+          <circle cx="267" cy="192" r="5" fill="var(--car)"></circle>
+
+          <rect x="365" y="184" width="98" height="16" rx="5" fill="var(--accent-soft)" stroke="var(--accent)" stroke-dasharray="4,3"></rect>
+          <text x="414" y="176" text-anchor="middle" font-size="11" fill="var(--accent)">forced out to 8</text>
+
+          <line x1="316" y1="222" x2="463" y2="222" stroke="var(--accent)" stroke-width="3"></line>
+          <circle cx="316" cy="222" r="4" fill="var(--accent)"></circle>
+          <circle cx="463" cy="222" r="4" fill="var(--accent)"></circle>
+          <text x="389" y="240" text-anchor="middle" font-size="11" fill="var(--accent)">extra_extent 2 &rarr; the passenger at floor 1 pays 2 &times; 2 = 4 ticks</text>
+        </g>
+
+        <!-- ===== verdict ===== -->
+        <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="11">
+          <text x="0" y="296" fill="var(--car)">E1: 2 + 0.5&times;3 + 0 = 3.5</text>
+          <text x="230" y="296" fill="var(--muted)">E2: 1 + 0.5&times;3 + 0.5&times;4 = 4.5</text>
+          <text x="500" y="296" fill="var(--accent)">&rarr; E1 wins, though E2 stands nearer</text>
+        </g>
+      </svg>
+      <p class="diagram-caption">E2 is one floor from the pickup and E1 is two, so any nearest-car scheduler takes E2. But E2 only runs as far as floor 6, so carrying this passenger to 8 drags its reversal point out by two floors &mdash; and the passenger waiting at floor 1, on the far side of that reversal, pays for those two floors twice. E1 already runs to 10, so the same trip costs nobody anything.</p>
+    </div>
+  </section>
+
+  <section>
+    <h2>Two things the engine forces</h2>
+    <ul>
+      <li><strong>A car's queue understates what it is committed to.</strong> <code>core/engine.py</code> adds a passenger's destination to <code>stop_queue</code> only at <em>boarding</em>, so a lobby car with eight people assigned and none aboard reads as completely idle &mdash; and an up-peak burst would pile onto it. The scheduler keeps a <strong>pledge ledger</strong> of promised-but-not-yet-handed-over destinations, pruned from observable car state alone so it cannot drift out of step.</li>
+      <li><strong>Simultaneous requests interact.</strong> Committing one request to a car moves that car's reversal point, which changes what the next one costs there. So the engine hands over the whole tick at once (<code>assign_batch</code>), and requests are placed by <strong>cheapest insertion</strong>: the ones that cost their best car nothing go first, then the rest are placed one at a time, cheapest pair first, re-scoring what remains after every commitment. A batch of one reduces to plain "pick the cheapest car", so there is only ever one scoring path.</li>
+    </ul>
+  </section>
+
+  <section>
+    <h2>It has to know how cars move</h2>
+    <p>These estimates are only exact if the scheduler knows where a car turns around, and that is the car policy's rule, not the scheduler's: <code>look.py</code> reverses at its last committed stop, <code>scan.py</code> runs on to the end of the building. <code>core/engine.py</code> hands the active policy over through <code>Scheduler.bind_car_policy()</code>, and <code>trip_estimator</code> takes the reversal rule as a parameter &mdash; one set of formulas, exact for both.</p>
+    <p class="callout">The same channel carries one more thing. When the bound policy is <code>bounded_detour</code>, a pickup <em>behind</em> a car need not wait out a full reversal &mdash; the car may turn back for it. Without asking the policy, the dispatcher would price every such pickup at the reversal cost and systematically pass over exactly the cars best placed to take it. See <code>docs/bounded_detour.html</code>.</p>
+  </section>
+
+  <section>
+    <h2>Measured effect</h2>
+    <p class="callout">On <code>sample_full_day.csv</code> at 4 cars and capacity 8, against <code>round_robin</code> with the same <code>look</code> policy: average wait drops from 13.3 to 4.9 ticks and max wait from 53 to 30. The sharper contrast is <code>estimate_drift</code> &mdash; avg 5.4 / max 50 becomes avg 0.1 / max 2 &mdash; because the promise is now a computed arrival rather than a guess. Compare <code>outputs/runs/round_robin_look_full_day/</code> against <code>outputs/runs/destination_dispatch_look_full_day/</code>.</p>
+  </section>
+
+  <footer>See <code>src/elevator_sim/schedulers/destination_dispatch.py</code> and <code>src/elevator_sim/schedulers/README.md</code> for the implementation, and <code>src/elevator_sim/core/trip_estimator.py</code> for the arithmetic it is built on.</footer>
+</main>
+</body>
+</html>

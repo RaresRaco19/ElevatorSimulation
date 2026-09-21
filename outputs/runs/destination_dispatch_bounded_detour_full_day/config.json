@@ -1,0 +1,14 @@
+{
+  "scheduler": "destination_dispatch",
+  "car_policy": "bounded_detour",
+  "floors": 35,
+  "elevators": [
+    "E1",
+    "E2",
+    "E3",
+    "E4"
+  ],
+  "capacity": 8,
+  "input_file": "data/requests/sample_full_day.csv",
+  "note": "car_policy=bounded_detour"
+}
