@@ -10,5 +10,10 @@
   ],
   "capacity": 8,
   "input_file": "data/requests/sample_full_day.csv",
-  "note": "car_policy=bounded_detour"
+  "note": "car_policy=bounded_detour",
+  "weights": {
+    "wait": 1.0,
+    "travel": 0.5,
+    "fairness": 0.5
+  }
 }

@@ -100,6 +100,46 @@
     padding-top: 14px;
   }
   .lede { margin: 0 0 30px; font-size: 1.02rem; }
+  a { color: var(--accent); }
+  .mono-block {
+    background: var(--mono-bg);
+    border-radius: 6px;
+    padding: 10px 12px;
+    margin: 0 0 4px;
+    font-size: 0.82rem;
+    line-height: 1.7;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    overflow-x: auto;
+  }
+  .mono-block + .diagram-caption { margin-bottom: 18px; }
+  table.data {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.86rem;
+  }
+  table.data th, table.data td {
+    padding: 7px 10px;
+    border-bottom: 1px solid var(--border);
+    text-align: left;
+    vertical-align: top;
+  }
+  table.data thead th {
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--muted);
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  table.data thead th.sub { text-transform: none; letter-spacing: 0; }
+  table.data tbody tr:last-child td { border-bottom: 0; }
+  table.data .num { text-align: right; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+  table.data th.num { text-align: right; }
+  table.data .group { border-left: 1px solid var(--border); }
+  table.data .em { color: var(--accent); font-weight: 600; }
+  table.data .best { color: var(--car); font-weight: 600; }
+  table.data .worst { color: var(--accent); font-weight: 600; }
+  table.data code { background: none; padding: 0; font-size: 0.95em; }
 </style>
 </head>
 <body>

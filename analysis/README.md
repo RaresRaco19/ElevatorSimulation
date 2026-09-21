@@ -15,6 +15,31 @@ Charts generated from a full config sweep across every scenario in `data/request
   every attempted config (converged or not) with that run's `passenger_stats.json`
   inlined. This is the prerequisite step for both scripts below, and for the `ui/`
   playback app's "Sweep" mode.
+- `scripts/run_sweep.py --weights` — the other question: holding the scheduler fixed at
+  `destination_dispatch`, how do its **cost weights** compare? Sweeps five presets x
+  three car policies over the same config grid (~6600 runs, about half a minute) and
+  writes `outputs/weights/manifest.json`. Weights and the movement rule interact, so
+  every preset is run against every policy rather than against one.
+
+  | preset | wait / travel / fairness | |
+  | --- | --- | --- |
+  | `default` | 1.0 / 0.5 / 0.5 | whatever `destination_dispatch.py`'s constants say |
+  | `ride-heavy` | 1.0 / 1.0 / 0.2 | ride time counts as much as waiting |
+  | `wait-first` | 1.0 / 0.25 / 0.25 | minimise waiting above all |
+  | `fair` | 1.0 / 0.5 / 1.5 | guard routes already promised to passengers |
+  | `selfish` | 1.0 / 0.5 / 0.0 | fairness off — nearest-car-with-a-real-ETA |
+
+  The same table, the cost formula it feeds, and the measured result per preset are
+  laid out in [`docs/cost_weights.html`](../docs/cost_weights.html).
+
+  Unlike the main sweep this writes **stats only**, no per-run output folders: the chart
+  needs nothing else, the UI doesn't browse this directory, and 6600 five-file runs would
+  cost ~100MB for nothing. To inspect one weighting as a real, playable run, use
+  `run_simulation.py`'s `--w-wait` / `--w-travel` / `--w-fairness` flags instead.
+
+  It writes to `outputs/weights/`, not `outputs/sweep/`, because each mode wipes its own
+  output directory on every run — sharing one would make them delete each other.
+
 - `scripts/compare_schedulers.py` — reads `manifest.json` and aggregates one score per
   (scheduler, car_policy) pair, averaged across the **entire** sweep by default (every
   scenario x every elevator count x every capacity). Reports two separate bar charts —
@@ -27,6 +52,13 @@ Charts generated from a full config sweep across every scenario in `data/request
   combinable for a range (`--min-elevators 2 --max-elevators 6`). Filtered runs write
   distinctly-named files (`..._min_elevators_N.png`, `..._max_elevators_N.png`, or
   both combined) rather than overwriting the full-sweep comparison.
+- `scripts/compare_schedulers.py --weights` — the same aggregation applied to
+  `outputs/weights/manifest.json`, grouped by `(preset, car_policy)` instead of
+  `(scheduler, car_policy)`, producing `weight_comparison_total_time.png` and
+  `weight_comparison_wait_time.png`. These are **grouped** bar charts — one x-axis group
+  per preset, one bar per car policy — because fifteen flat bars would need a 33-inch
+  figure and would hide the very interaction they exist to show. The elevator-count
+  filters work here too.
 - `scripts/plot_wait_times.py` — elevators (1-10) on the X axis, one trace per
   capacity (3/5/8/13), Y axis = avg metric, in two modes:
   - `--scenario X --scheduler Y --car-policy Z` — one scenario's own chart, useful for
@@ -54,6 +86,8 @@ python analysis/scripts/compare_schedulers.py
 python analysis/scripts/compare_schedulers.py --min-elevators 4
 python analysis/scripts/compare_schedulers.py --max-elevators 5
 python analysis/scripts/compare_schedulers.py --max-elevators 6
+python analysis/scripts/run_sweep.py --weights
+python analysis/scripts/compare_schedulers.py --weights
 python analysis/scripts/plot_wait_times.py --aggregate
 python analysis/scripts/plot_wait_times.py \
     --scenario sample_full_day_skyscraper50 --scheduler round_robin --car-policy scan
@@ -78,6 +112,15 @@ Averaged across the entire sweep (`compare_schedulers.py` with no filter), in ti
 | round_robin + bounded_detour | 18.3 | 39.2 |
 | round_robin + look | 19.0 | 39.8 |
 | round_robin + scan | 19.2 | 42.8 |
+
+And across the weight sweep (`compare_schedulers.py --weights`), the cost weights move
+things far less than the scheduler does — a useful negative result. Two things do stand
+out: `selfish` (fairness off) is the worst weighting for `look` and `bounded_detour`
+(total_time 36.0 / 35.3 against `default`'s 34.9 / 34.3), so the fairness term earns its
+place; and under `scan` the weights barely matter at all — `fair` and `selfish` score
+*identically* (39.9 / 17.2). That second one is a consistency check rather than a
+coincidence: under true SCAN a car reverses at the building's end no matter what, so
+`delta_imposed_on_existing` is always 0 and `W_FAIRNESS` has nothing to multiply.
 
 Two things to read off it. The scheduler matters more than the car policy — swapping
 `round_robin` for `destination_dispatch` buys more than any movement rule does. And the

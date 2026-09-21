@@ -6,9 +6,12 @@ passenger's destination, which every other scheduler here throws away.
 scheduler scores three things instead, all of them exact closed-form values from
 core/trip_estimator.py (no per-candidate simulation):
 
-    cost = W_WAIT     * ticks_to_pickup                      how long this passenger waits
-         + W_TRAVEL   * (ticks_to_dropoff - ticks_to_pickup) how long they then ride
-         + W_FAIRNESS * delta_imposed_on_existing            what it costs everyone else
+    cost = w_wait     * ticks_to_pickup                      how long this passenger waits
+         + w_travel   * (ticks_to_dropoff - ticks_to_pickup) how long they then ride
+         + w_fairness * delta_imposed_on_existing            what it costs everyone else
+
+The weights are constructor arguments defaulting to the W_* constants below, so a run
+can be scored under any weighting without editing this file.
 
 The third term is the one destination knowledge buys. Sending a passenger to a car whose
 sweep already covers both their floors is nearly free; sending them to a car that has to
@@ -44,18 +47,31 @@ from elevator_sim.core import trip_estimator as te
 from elevator_sim.core.models import Elevator, Request
 from .base import Scheduler
 
-# Relative weights of the three cost terms. Waiting at a floor with no information is
-# worse than riding in a car that is visibly moving, so waiting is weighted heaviest;
-# delay imposed on people who were already promised a car is weighted the same as the
-# new passenger's own ride, so the scheduler won't wreck a committed route to shave a
-# tick off one trip.
+# Default relative weights of the three cost terms. Waiting at a floor with no
+# information is worse than riding in a car that is visibly moving, so waiting is
+# weighted heaviest; delay imposed on people who were already promised a car is weighted
+# the same as the new passenger's own ride, so the scheduler won't wreck a committed
+# route to shave a tick off one trip.
+#
+# These are defaults, not fixed rules -- an instance can be built with any weighting, and
+# analysis/scripts/run_sweep.py --weights sweeps a table of presets so the settings can
+# be compared on evidence rather than argued about. Only the ratios matter: the cost
+# ranks candidate cars and is never reported, so scaling all three changes nothing.
 W_WAIT = 1.0
 W_TRAVEL = 0.5
 W_FAIRNESS = 0.5
 
 
 class DestinationDispatchScheduler(Scheduler):
-    def __init__(self):
+    def __init__(
+        self,
+        w_wait: float = W_WAIT,
+        w_travel: float = W_TRAVEL,
+        w_fairness: float = W_FAIRNESS,
+    ):
+        self.w_wait = w_wait
+        self.w_travel = w_travel
+        self.w_fairness = w_fairness
         self._car_policy = None
         # elevator id -> {request id: (source, dest)} for requests this scheduler has
         # promised to a car but whose destination the engine has not yet committed.
@@ -123,13 +139,12 @@ class DestinationDispatchScheduler(Scheduler):
 
     # -- scoring ---------------------------------------------------------------
 
-    @staticmethod
-    def _cost(result: te.InsertionResult) -> float:
+    def _cost(self, result: te.InsertionResult) -> float:
         ride = result.ticks_to_dropoff - result.ticks_to_pickup
         return (
-            W_WAIT * result.ticks_to_pickup
-            + W_TRAVEL * ride
-            + W_FAIRNESS * result.delta_imposed_on_existing
+            self.w_wait * result.ticks_to_pickup
+            + self.w_travel * ride
+            + self.w_fairness * result.delta_imposed_on_existing
         )
 
     def _best_car(self, states, rank, request):

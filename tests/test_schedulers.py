@@ -438,6 +438,72 @@ class TestDestinationDispatchScheduler:
         assert all(p.dropoff_time is not None for p in passengers)
         assert all(p.pickup_time >= p.request.time for p in passengers)
 
+    # -- cost weights ----------------------------------------------------------
+    #
+    # All three share the fixture from test_prefers_a_car_whose_sweep_already_covers_the
+    # _trip: E1 sweeps 3 -> 10 so the 5 -> 8 trip nests inside it (wait 2, ride 3, delay
+    # 0); E2 stands nearer at 4 but only sweeps to 6, so the trip drags its reversal out
+    # and the passenger waiting at floor 1 pays for it (wait 1, ride 3, delay 4). Which
+    # car wins is therefore decided entirely by the weighting -- the same example
+    # docs/destination_dispatch.html walks through.
+
+    @staticmethod
+    def _two_car_fixture():
+        return [
+            _car("E1", 3, direction=Direction.UP, stops=(10,)),
+            _car("E2", 4, direction=Direction.UP, stops=(1, 6)),
+        ]
+
+    REQUEST = Request(time=0, id="R1", source=5, dest=8)
+
+    def test_weights_default_to_the_module_constants(self):
+        scheduler = DestinationDispatchScheduler()
+
+        assert (scheduler.w_wait, scheduler.w_travel, scheduler.w_fairness) == (
+            dd.W_WAIT,
+            dd.W_TRAVEL,
+            dd.W_FAIRNESS,
+        )
+
+    def test_zero_fairness_weight_picks_the_nearer_car(self):
+        """With the fairness term switched off the scheduler stops caring what an
+        assignment costs everyone else, and degenerates to nearest-car-with-a-real-ETA --
+        so E2, one floor from the pickup, wins."""
+        scheduler = DestinationDispatchScheduler(w_fairness=0.0)
+        scheduler.bind_car_policy(LookPolicy())
+
+        chosen, _ = scheduler.assign(self.REQUEST, self._two_car_fixture(), 0, FLOORS)
+
+        assert chosen == "E2"
+
+    def test_raising_the_fairness_weight_keeps_the_committed_route(self):
+        """The mirror case: weight the delay imposed on others heavily and the scheduler
+        protects E2's committed route, sending the request to E1 instead."""
+        scheduler = DestinationDispatchScheduler(w_fairness=1.5)
+        scheduler.bind_car_policy(LookPolicy())
+
+        chosen, _ = scheduler.assign(self.REQUEST, self._two_car_fixture(), 0, FLOORS)
+
+        assert chosen == "E1"
+
+    def test_weights_reach_the_cost_function(self):
+        # Scaling every weight by the same factor scales the cost by that factor and
+        # cannot change the ranking -- only the ratios carry information.
+        result = te.evaluate_insertion(
+            te.CarState(
+                id="E1", floor=3, direction=Direction.UP, stops=frozenset({10}),
+                load=0, capacity=8, floors=FLOORS,
+            ),
+            5,
+            8,
+        )
+        base = DestinationDispatchScheduler()
+        scaled = DestinationDispatchScheduler(
+            w_wait=dd.W_WAIT * 3, w_travel=dd.W_TRAVEL * 3, w_fairness=dd.W_FAIRNESS * 3
+        )
+
+        assert scaled._cost(result) == pytest.approx(base._cost(result) * 3)
+
     def test_estimates_are_more_accurate_than_the_naive_distance_guess(self):
         """estimated_wait_time is the scheduler's own promise (see
         outputs/runs/README.md's estimate_drift). round_robin guesses plain distance;

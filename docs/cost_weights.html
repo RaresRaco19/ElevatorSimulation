@@ -1,0 +1,313 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Destination Dispatch Cost Weights</title>
+<style>
+  :root {
+    --bg: #fbfaf8;
+    --panel: #ffffff;
+    --border: #e3ded6;
+    --text: #2a2724;
+    --muted: #6b655d;
+    --accent: #b5622f;
+    --accent-soft: #f1e2d6;
+    --car: #5a7a8c;
+    --car-soft: #dfe9ed;
+    --mono-bg: #f3efe8;
+    color-scheme: light dark;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1c1a18;
+      --panel: #26221f;
+      --border: #3a3530;
+      --text: #ece7e0;
+      --muted: #a89f93;
+      --accent: #e08a52;
+      --accent-soft: #3a2c22;
+      --car: #8fb4c7;
+      --car-soft: #26343b;
+      --mono-bg: #2c2825;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font: 15px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  }
+  main {
+    max-width: 760px;
+    margin: 0 auto;
+    padding: 40px 20px 64px;
+  }
+  h1 {
+    font-size: 1.55rem;
+    margin: 0 0 4px;
+    letter-spacing: -0.01em;
+  }
+  .tagline {
+    color: var(--muted);
+    margin: 0 0 32px;
+    font-size: 0.98rem;
+  }
+  h2 {
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--accent);
+    margin: 0 0 12px;
+  }
+  section { margin-bottom: 34px; }
+  ul { margin: 0; padding-left: 1.1em; }
+  li { margin-bottom: 7px; }
+  li:last-child { margin-bottom: 0; }
+  code {
+    background: var(--mono-bg);
+    border-radius: 4px;
+    padding: 0.1em 0.35em;
+    font-size: 0.88em;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 18px 20px;
+  }
+  .callout {
+    background: var(--accent-soft);
+    border-radius: 10px;
+    padding: 14px 18px;
+    font-size: 0.94rem;
+  }
+  .callout code { background: rgba(0,0,0,0.08); }
+  @media (prefers-color-scheme: dark) { .callout code { background: rgba(255,255,255,0.1); } }
+  svg { width: 100%; height: auto; display: block; }
+  .diagram-caption {
+    color: var(--muted);
+    font-size: 0.82rem;
+    margin-top: 8px;
+  }
+  footer {
+    margin-top: 40px;
+    color: var(--muted);
+    font-size: 0.82rem;
+    border-top: 1px solid var(--border);
+    padding-top: 14px;
+  }
+  .lede { margin: 0 0 30px; font-size: 1.02rem; }
+  a { color: var(--accent); }
+  .mono-block {
+    background: var(--mono-bg);
+    border-radius: 6px;
+    padding: 10px 12px;
+    margin: 0 0 4px;
+    font-size: 0.82rem;
+    line-height: 1.7;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    overflow-x: auto;
+  }
+  .mono-block + .diagram-caption { margin-bottom: 18px; }
+  table.data {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.86rem;
+  }
+  table.data th, table.data td {
+    padding: 7px 10px;
+    border-bottom: 1px solid var(--border);
+    text-align: left;
+    vertical-align: top;
+  }
+  table.data thead th {
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--muted);
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  table.data thead th.sub { text-transform: none; letter-spacing: 0; }
+  table.data tbody tr:last-child td { border-bottom: 0; }
+  table.data .num { text-align: right; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+  table.data th.num { text-align: right; }
+  table.data .group { border-left: 1px solid var(--border); }
+  table.data .em { color: var(--accent); font-weight: 600; }
+  table.data .best { color: var(--car); font-weight: 600; }
+  table.data .worst { color: var(--accent); font-weight: 600; }
+  table.data code { background: none; padding: 0; font-size: 0.95em; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Cost Weights</h1>
+  <p class="tagline">The three numbers that decide which car wins &mdash; <code>src/elevator_sim/schedulers/destination_dispatch.py</code></p>
+
+  <p class="lede"><a href="destination_dispatch.html">Destination dispatch</a> ranks every candidate car with one formula. These weights set what it cares about, and swapping them genuinely changes which car takes a request &mdash; so they are swept and charted rather than argued about.</p>
+
+  <section>
+    <h2>The formula</h2>
+    <div class="panel">
+      <svg viewBox="0 0 720 166" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Cost function: W_WAIT 1.0 times ticks to pickup, plus W_TRAVEL 0.5 times ride time, plus W_FAIRNESS 0.5 times the delay imposed on existing passengers">
+        <text x="0" y="13" font-size="11" fill="var(--muted)" font-family="ui-monospace, Menlo, Consolas, monospace">COST OF GIVING THIS REQUEST TO THIS CAR</text>
+
+        <rect x="0" y="26" width="224" height="100" rx="9" fill="var(--car-soft)" stroke="var(--car)"></rect>
+        <text x="112" y="46" text-anchor="middle" font-size="10.5" fill="var(--muted)" font-family="ui-monospace, Menlo, Consolas, monospace">W_WAIT</text>
+        <text x="112" y="72" text-anchor="middle" font-size="18" fill="var(--car)" font-weight="600" font-family="ui-monospace, Menlo, Consolas, monospace">&times; 1.0</text>
+        <text x="112" y="94" text-anchor="middle" font-size="11" fill="var(--text)" font-family="ui-monospace, Menlo, Consolas, monospace">ticks_to_pickup</text>
+        <text x="112" y="114" text-anchor="middle" font-size="11" fill="var(--muted)">time spent waiting</text>
+
+        <text x="236" y="82" text-anchor="middle" font-size="17" fill="var(--muted)">+</text>
+
+        <rect x="248" y="26" width="224" height="100" rx="9" fill="var(--car-soft)" stroke="var(--car)"></rect>
+        <text x="360" y="46" text-anchor="middle" font-size="10.5" fill="var(--muted)" font-family="ui-monospace, Menlo, Consolas, monospace">W_TRAVEL</text>
+        <text x="360" y="72" text-anchor="middle" font-size="18" fill="var(--car)" font-weight="600" font-family="ui-monospace, Menlo, Consolas, monospace">&times; 0.5</text>
+        <text x="360" y="94" text-anchor="middle" font-size="11" fill="var(--text)" font-family="ui-monospace, Menlo, Consolas, monospace">ride time</text>
+        <text x="360" y="114" text-anchor="middle" font-size="11" fill="var(--muted)">pickup &rarr; dropoff</text>
+
+        <text x="484" y="82" text-anchor="middle" font-size="17" fill="var(--muted)">+</text>
+
+        <rect x="496" y="26" width="224" height="100" rx="9" fill="var(--accent-soft)" stroke="var(--accent)"></rect>
+        <text x="608" y="46" text-anchor="middle" font-size="10.5" fill="var(--accent)" font-family="ui-monospace, Menlo, Consolas, monospace">W_FAIRNESS</text>
+        <text x="608" y="72" text-anchor="middle" font-size="18" fill="var(--accent)" font-weight="600" font-family="ui-monospace, Menlo, Consolas, monospace">&times; 0.5</text>
+        <text x="608" y="94" text-anchor="middle" font-size="11" fill="var(--text)" font-family="ui-monospace, Menlo, Consolas, monospace">delay_imposed</text>
+        <text x="608" y="114" text-anchor="middle" font-size="11" fill="var(--muted)">what everyone else pays</text>
+
+        <text x="360" y="154" text-anchor="middle" font-size="11.5" fill="var(--accent)">Lowest total wins &mdash; and only the third term needs to know the destination.</text>
+      </svg>
+      <p class="diagram-caption">Multipliers shown are the shipped defaults. They are module constants at the top of <code>destination_dispatch.py</code> and constructor arguments on the scheduler, so any run can be scored under any weighting without editing the file.</p>
+    </div>
+  </section>
+
+  <section>
+    <h2>Presets</h2>
+    <div class="panel">
+      <table class="data">
+        <thead>
+          <tr>
+            <th>preset</th>
+            <th class="num"><code>W_WAIT</code></th>
+            <th class="num"><code>W_TRAVEL</code></th>
+            <th class="num"><code>W_FAIRNESS</code></th>
+            <th>what it expresses</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><code>default</code></td>
+            <td class="num">1.0</td><td class="num">0.5</td><td class="num">0.5</td>
+            <td>The shipped setting: waiting hurts twice as much as riding.</td>
+          </tr>
+          <tr>
+            <td><code>ride-heavy</code></td>
+            <td class="num">1.0</td><td class="num em">1.0</td><td class="num em">0.2</td>
+            <td>A tick riding is as bad as a tick waiting, and other passengers barely count.</td>
+          </tr>
+          <tr>
+            <td><code>wait-first</code></td>
+            <td class="num">1.0</td><td class="num em">0.25</td><td class="num em">0.25</td>
+            <td>Waiting dominates everything &mdash; minimise it at the cost of longer rides.</td>
+          </tr>
+          <tr>
+            <td><code>fair</code></td>
+            <td class="num">1.0</td><td class="num">0.5</td><td class="num em">1.5</td>
+            <td>Delay imposed on others outweighs the new passenger's own wait.</td>
+          </tr>
+          <tr>
+            <td><code>selfish</code></td>
+            <td class="num">1.0</td><td class="num">0.5</td><td class="num em">0.0</td>
+            <td>Fairness term deleted &mdash; degenerates to nearest-car-with-a-real-ETA.</td>
+          </tr>
+        </tbody>
+      </table>
+      <p class="diagram-caption">Declared in <code>analysis/scripts/run_sweep.py</code>. <code>default</code> is not hardcoded there &mdash; it is written <code>(dd.W_WAIT, dd.W_TRAVEL, dd.W_FAIRNESS)</code>, so retuning the shipped constants moves this row automatically and it stays a true baseline instead of silently becoming a stale fourth variant.</p>
+    </div>
+  </section>
+
+  <section>
+    <h2>Why W_WAIT is 1.0 everywhere</h2>
+    <div class="panel">
+      <svg viewBox="0 0 720 118" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Scaling all three weights by the same factor scales the cost by that factor and cannot change which car ranks first">
+        <text x="0" y="13" font-size="11" fill="var(--muted)" font-family="ui-monospace, Menlo, Consolas, monospace">SCALING EVERY WEIGHT CHANGES THE NUMBERS, NEVER THE RANKING</text>
+
+        <text x="0" y="46" font-size="11" fill="var(--muted)" font-family="ui-monospace, Menlo, Consolas, monospace">1.0 / 0.5 / 0.5</text>
+        <rect x="150" y="34" width="98" height="16" rx="4" fill="var(--car)"></rect>
+        <text x="256" y="46" font-size="11" fill="var(--car)" font-family="ui-monospace, Menlo, Consolas, monospace">E1 3.5</text>
+        <rect x="320" y="34" width="126" height="16" rx="4" fill="var(--muted)" opacity="0.4"></rect>
+        <text x="454" y="46" font-size="11" fill="var(--muted)" font-family="ui-monospace, Menlo, Consolas, monospace">E2 4.5</text>
+
+        <text x="0" y="82" font-size="11" fill="var(--muted)" font-family="ui-monospace, Menlo, Consolas, monospace">3.0 / 1.5 / 1.5</text>
+        <rect x="150" y="70" width="294" height="16" rx="4" fill="var(--car)"></rect>
+        <text x="452" y="82" font-size="11" fill="var(--car)" font-family="ui-monospace, Menlo, Consolas, monospace">E1 10.5</text>
+        <rect x="520" y="70" width="162" height="16" rx="4" fill="var(--muted)" opacity="0.4"></rect>
+        <text x="690" y="82" font-size="11" fill="var(--muted)" font-family="ui-monospace, Menlo, Consolas, monospace">13.5</text>
+
+        <text x="360" y="110" text-anchor="middle" font-size="11.5" fill="var(--accent)">Only the ratios carry information &mdash; so pinning W_WAIT at 1.0 costs nothing.</text>
+      </svg>
+      <p class="diagram-caption">The cost ranks candidate cars and is never reported to anyone, so a common factor cancels out. Pinning <code>W_WAIT</code> at 1.0 in every preset therefore loses no generality and makes the other two columns read directly as &ldquo;relative to waiting&rdquo;. <code>tests/test_schedulers.py</code>'s <code>test_weights_reach_the_cost_function</code> pins exactly that.</p>
+    </div>
+  </section>
+
+  <section>
+    <h2>Measured</h2>
+    <div class="panel">
+      <table class="data">
+        <thead>
+          <tr>
+            <th rowspan="2">preset</th>
+            <th class="num group" colspan="2"><code>scan</code></th>
+            <th class="num group" colspan="2"><code>look</code></th>
+            <th class="num group" colspan="2"><code>bounded_detour</code></th>
+          </tr>
+          <tr>
+            <th class="num sub group">wait</th><th class="num sub">total</th>
+            <th class="num sub group">wait</th><th class="num sub">total</th>
+            <th class="num sub group">wait</th><th class="num sub">total</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr><td><code>default</code></td>
+            <td class="num group">17.2</td><td class="num">39.9</td>
+            <td class="num group">15.2</td><td class="num">34.9</td>
+            <td class="num group">14.5</td><td class="num">34.3</td></tr>
+          <tr><td><code>ride-heavy</code></td>
+            <td class="num group">17.7</td><td class="num">39.8</td>
+            <td class="num group">15.4</td><td class="num">35.1</td>
+            <td class="num group">15.0</td><td class="num">34.6</td></tr>
+          <tr><td><code>wait-first</code></td>
+            <td class="num group">17.2</td><td class="num">40.2</td>
+            <td class="num group best">14.9</td><td class="num">34.9</td>
+            <td class="num group best">14.4</td><td class="num best">34.3</td></tr>
+          <tr><td><code>fair</code></td>
+            <td class="num group">17.2</td><td class="num">39.9</td>
+            <td class="num group">15.2</td><td class="num best">34.8</td>
+            <td class="num group">14.8</td><td class="num">34.5</td></tr>
+          <tr><td><code>selfish</code></td>
+            <td class="num group">17.2</td><td class="num">39.9</td>
+            <td class="num group">15.5</td><td class="num worst">36.0</td>
+            <td class="num group">14.9</td><td class="num worst">35.3</td></tr>
+        </tbody>
+      </table>
+      <p class="diagram-caption">Average ticks over the whole sweep &mdash; 11 scenarios x 1&ndash;10 cars x capacities 3/5/8/13, 1320 runs per preset. Best in column marked, worst marked in red.</p>
+    </div>
+    <p class="callout" style="margin-top:14px">Two things to read off it. <strong>Turning fairness off costs you</strong>: <code>selfish</code> is the worst weighting for both <code>look</code> and <code>bounded_detour</code>, so the term earns its place. And <strong>under <code>scan</code> the weights barely register</strong> &mdash; <code>fair</code> and <code>selfish</code> score <em>identically</em> (17.2 / 39.9) despite sitting at opposite ends of the fairness range. That is a consistency check rather than a coincidence: a true-SCAN car reverses at the building's end no matter what, so <code>delta_imposed</code> is permanently 0 and <code>W_FAIRNESS</code> has nothing to multiply.</p>
+  </section>
+
+  <section>
+    <h2>Running it yourself</h2>
+    <div class="panel">
+      <p class="mono-block">python analysis/scripts/run_sweep.py --weights<br />python analysis/scripts/compare_schedulers.py --weights</p>
+      <p class="diagram-caption">The first writes <code>outputs/weights/manifest.json</code> (~6600 runs, about half a minute, stats only &mdash; no per-run folders). The second charts it as <code>analysis/figures/weight_comparison_wait_time.png</code> and <code>_total_time.png</code>, grouped by preset with one bar per car policy.</p>
+      <p class="mono-block">python -m elevator_sim.run_simulation --scheduler destination_dispatch --car-policy look \<br />&nbsp;&nbsp;&nbsp;&nbsp;--requests data/requests/sample_full_day.csv --elevators 4 --floors 35 --capacity 8 \<br />&nbsp;&nbsp;&nbsp;&nbsp;--w-travel 1.0 --w-fairness 0.2 --out outputs/dd_ride_heavy_full_day</p>
+      <p class="diagram-caption">To watch one weighting instead of averaging it: the <code>--w-*</code> flags produce an ordinary run folder that shows up in the <code>ui/</code> playback app, and the effective weights are recorded in its <code>config.json</code>. Omitted flags fall back to the module constants, so every command that doesn't mention them is unaffected.</p>
+    </div>
+  </section>
+
+  <footer>See <a href="destination_dispatch.html">docs/destination_dispatch.html</a> for what the three terms mean and a worked example of the fairness term deciding a request, <code>src/elevator_sim/schedulers/destination_dispatch.py</code> for the implementation, and <code>analysis/README.md</code> for the sweep.</footer>
+</main>
+</body>
+</html>

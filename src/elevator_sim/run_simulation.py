@@ -39,19 +39,42 @@ def main():
     parser.add_argument("--floors", type=int, required=True)
     parser.add_argument("--capacity", type=int, required=True)
     parser.add_argument("--out", required=True)
+    # Cost weights for --scheduler destination_dispatch. Omitted means "use that
+    # scheduler's own default", so every existing command is unaffected. See
+    # analysis/scripts/run_sweep.py --weights for comparing settings across the sweep.
+    parser.add_argument("--w-wait", type=float, help="weight on time spent waiting")
+    parser.add_argument("--w-travel", type=float, help="weight on time spent riding")
+    parser.add_argument(
+        "--w-fairness", type=float, help="weight on delay imposed on other passengers"
+    )
     args = parser.parse_args()
 
     if args.elevators < 1:
         parser.error("--elevators must be at least 1")
+
+    weights = {
+        name: value
+        for name, value in (
+            ("w_wait", args.w_wait),
+            ("w_travel", args.w_travel),
+            ("w_fairness", args.w_fairness),
+        )
+        if value is not None
+    }
+    if weights and args.scheduler != "destination_dispatch":
+        # Fail loudly rather than silently ignore a flag the caller believed took effect.
+        parser.error(
+            "--w-wait/--w-travel/--w-fairness only apply to "
+            f"--scheduler destination_dispatch, not {args.scheduler}"
+        )
 
     requests = io.load_requests(args.requests)
     elevator_ids = [f"E{i + 1}" for i in range(args.elevators)]
     elevators = [Elevator(id=eid, current_floor=1, capacity=args.capacity) for eid in elevator_ids]
     building = Building(floors=args.floors, elevators=elevators)
 
-    simulation = Simulation(
-        building, requests, SCHEDULERS[args.scheduler](), CAR_POLICIES[args.car_policy]()
-    )
+    scheduler = SCHEDULERS[args.scheduler](**weights)
+    simulation = Simulation(building, requests, scheduler, CAR_POLICIES[args.car_policy]())
     passengers, position_log = simulation.run()
 
     os.makedirs(args.out, exist_ok=True)
@@ -61,18 +84,24 @@ def main():
     io.write_passenger_stats(
         metrics.compute_passenger_stats(passengers), os.path.join(args.out, "passenger_stats.json")
     )
-    io.write_run_config(
-        {
-            "scheduler": args.scheduler,
-            "car_policy": args.car_policy,
-            "floors": args.floors,
-            "elevators": elevator_ids,
-            "capacity": args.capacity,
-            "input_file": args.requests,
-            "note": f"car_policy={args.car_policy}",
-        },
-        os.path.join(args.out, "config.json"),
-    )
+    config = {
+        "scheduler": args.scheduler,
+        "car_policy": args.car_policy,
+        "floors": args.floors,
+        "elevators": elevator_ids,
+        "capacity": args.capacity,
+        "input_file": args.requests,
+        "note": f"car_policy={args.car_policy}",
+    }
+    if args.scheduler == "destination_dispatch":
+        # The weights actually used, read back off the scheduler -- so the record is the
+        # effective setting, not just whichever flags happened to be passed.
+        config["weights"] = {
+            "wait": scheduler.w_wait,
+            "travel": scheduler.w_travel,
+            "fairness": scheduler.w_fairness,
+        }
+    io.write_run_config(config, os.path.join(args.out, "config.json"))
 
 
 if __name__ == "__main__":

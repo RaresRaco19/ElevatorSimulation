@@ -10,5 +10,10 @@
   ],
   "capacity": 8,
   "input_file": "data/requests/sample_full_day.csv",
-  "note": "car_policy=look"
+  "note": "car_policy=look",
+  "weights": {
+    "wait": 1.0,
+    "travel": 0.5,
+    "fairness": 0.5
+  }
 }

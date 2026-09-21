@@ -100,6 +100,46 @@
     padding-top: 14px;
   }
   .lede { margin: 0 0 30px; font-size: 1.02rem; }
+  a { color: var(--accent); }
+  .mono-block {
+    background: var(--mono-bg);
+    border-radius: 6px;
+    padding: 10px 12px;
+    margin: 0 0 4px;
+    font-size: 0.82rem;
+    line-height: 1.7;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    overflow-x: auto;
+  }
+  .mono-block + .diagram-caption { margin-bottom: 18px; }
+  table.data {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.86rem;
+  }
+  table.data th, table.data td {
+    padding: 7px 10px;
+    border-bottom: 1px solid var(--border);
+    text-align: left;
+    vertical-align: top;
+  }
+  table.data thead th {
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--muted);
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  table.data thead th.sub { text-transform: none; letter-spacing: 0; }
+  table.data tbody tr:last-child td { border-bottom: 0; }
+  table.data .num { text-align: right; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+  table.data th.num { text-align: right; }
+  table.data .group { border-left: 1px solid var(--border); }
+  table.data .em { color: var(--accent); font-weight: 600; }
+  table.data .best { color: var(--car); font-weight: 600; }
+  table.data .worst { color: var(--accent); font-weight: 600; }
+  table.data code { background: none; padding: 0; font-size: 0.95em; }
 </style>
 </head>
 <body>
@@ -186,7 +226,8 @@
         <text x="608" y="127" text-anchor="middle" font-size="11" fill="var(--accent)">&rarr; E1, by 5.0</text>
       </svg>
       <p class="diagram-caption">Three rules of thumb. <strong>Only the ratios matter</strong> &mdash; the cost is used to rank cars, never reported, so doubling all three changes nothing. <strong><code>W_FAIRNESS</code> is the one that changes behaviour</strong>: at 0 the scheduler degenerates to nearest-car-with-a-real-ETA, and raising it trades a longer wait for the new passenger against protecting people already promised a car. <strong><code>W_TRAVEL</code> is the least useful knob</strong>, because ride time is mostly fixed by the building's geometry rather than by which car you pick &mdash; it is kept below <code>W_WAIT</code> so a short ride can never outvote a long wait.</p>
-      <p class="diagram-caption">These values are judgement, not a fit. To tune them against evidence, edit the constants, re-run <code>analysis/scripts/run_sweep.py</code>, and compare <code>wait_time</code> and <code>total_time</code> with <code>analysis/scripts/compare_schedulers.py</code> &mdash; the sweep covers every scenario at 1&ndash;10 cars and four capacities, so a weight that only helps one traffic pattern shows up as a wash there.</p>
+      <p class="diagram-caption">These values are judgement, not a fit &mdash; so there is a sweep for settling it. <code>run_sweep.py --weights</code> scores five named presets against all three car policies over every scenario at 1&ndash;10 cars and four capacities, and <code>compare_schedulers.py --weights</code> charts them, so a weight that only helps one traffic pattern shows up as a wash. Single runs take <code>--w-wait</code> / <code>--w-travel</code> / <code>--w-fairness</code> if you want to watch one weighting play back in the UI. The exact presets and what each one scores are in <a href="cost_weights.html">cost_weights.html</a>.</p>
+      <div class="callout" style="margin-top:12px">What that sweep says today: the weights move far less than the scheduler choice does. Turning fairness off is the clearest loss (<code>selfish</code> costs <code>look</code> about a tick of avg total time), and under <code>scan</code> the weights barely register at all &mdash; a car that always reverses at the building's end imposes nothing on anyone, so <code>delta_imposed</code> is permanently 0 and <code>W_FAIRNESS</code> has nothing to multiply.</div>
     </div>
   </section>
 
