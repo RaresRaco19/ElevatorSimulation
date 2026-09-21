@@ -175,16 +175,12 @@ TODO
 
 ## What I'd improve with more time
 
-- Implement the `fcfs.py` car policy and the `zone_based.py` scheduler stub, and wire
-  `express.py` into the CLI, for a fuller fairness/efficiency comparison.
 - Teach `destination_dispatch` about `serviceable_floors` so it can dispatch a mixed
   express/regular fleet.
 - Model door/boarding delay, so simultaneous pickups aren't free and capacity
   constraints bite more realistically. This is the change that would cost
   `trip_estimator` its exactness, so it wants doing deliberately.
-- Write `tests/test_engine.py`, the one test file still a TODO comment.
 - Adapt the cost weights to the traffic. `1.0 / 0.25 / 0.25` was chosen from the
   sweep, but it is the strongest setting on some scenarios and mid-table on others
   (see [`docs/cost_weights.html`](docs/cost_weights.html)) — a scheduler that retuned
   itself to the pattern it was seeing would beat any single fixed choice.
-- Package the project properly (`pyproject.toml`) so `PYTHONPATH=src` isn't required.

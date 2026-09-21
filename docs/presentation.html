@@ -1,0 +1,993 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Elevator System Simulation &mdash; presentation</title>
+<style>
+  :root {
+    --bg: #fbfaf8;
+    --panel: #ffffff;
+    --border: #e3ded6;
+    --text: #2a2724;
+    --muted: #6b655d;
+    --accent: #b5622f;
+    --accent-soft: #f1e2d6;
+    --car: #5a7a8c;
+    --car-soft: #dfe9ed;
+    --mono-bg: #f3efe8;
+    --stage: #efece6;
+    color-scheme: light dark;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #26221f;
+      --panel: #2e2a26;
+      --border: #3a3530;
+      --text: #ece7e0;
+      --muted: #a89f93;
+      --accent: #e08a52;
+      --accent-soft: #3a2c22;
+      --car: #8fb4c7;
+      --car-soft: #26343b;
+      --mono-bg: #2c2825;
+      --stage: #1c1a18;
+    }
+  }
+
+  * { box-sizing: border-box; }
+  html, body { height: 100%; }
+  body {
+    margin: 0;
+    background: var(--stage);
+    color: var(--text);
+    font: 16px/1.5 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    overflow: hidden;
+  }
+
+  /* ---- stage: a fixed 1280x720 frame scaled to whatever the projector gives us ---- */
+  #viewport { position: fixed; inset: 0; display: grid; place-items: center; }
+  #frame {
+    width: 1280px; height: 720px;
+    position: relative;
+    transform: scale(var(--scale, 1));
+    transform-origin: center center;
+  }
+
+  .slide {
+    position: absolute; inset: 0;
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 46px 60px 40px;
+    display: none;
+    flex-direction: column;
+  }
+  .slide.active { display: flex; }
+
+  .slide > header { flex: 0 0 auto; margin-bottom: 20px; }
+  .kicker {
+    margin: 0 0 6px;
+    font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.09em;
+    color: var(--accent);
+  }
+  .slide h2 {
+    margin: 0;
+    font-size: 2.05rem; line-height: 1.15; letter-spacing: -0.015em; font-weight: 600;
+  }
+  .slide .body {
+    flex: 1 1 auto; min-height: 0;
+    display: flex; flex-direction: column; justify-content: center; gap: 16px;
+    overflow: hidden; /* guard: nothing spills past the slide edge if a cap is off */
+  }
+  .slide > footer {
+    flex: 0 0 auto;
+    display: flex; justify-content: space-between; align-items: baseline;
+    margin-top: 18px; padding-top: 10px;
+    border-top: 1px solid var(--border);
+    color: var(--muted); font-size: 0.74rem; letter-spacing: 0.04em;
+  }
+  .stamp { color: var(--accent); font-weight: 600; }
+
+  /* slide 1 is a title card */
+  .slide[data-section="1"] { padding-top: 62px; }
+  .slide[data-section="1"] h2 { font-size: 2.9rem; }
+
+  /* ---- shared type ---- */
+  p { margin: 0; }
+  .lede { font-size: 1.12rem; color: var(--text); max-width: 62ch; }
+  .note { font-size: 0.95rem; color: var(--muted); max-width: 88ch; }
+  .note strong, .ticks strong { color: var(--text); }
+  .foot-note { font-size: 0.95rem; color: var(--muted); font-style: italic; }
+  code {
+    background: var(--mono-bg); border-radius: 4px; padding: 0.1em 0.35em;
+    font-size: 0.88em; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  .callout {
+    background: var(--accent-soft); border-radius: 10px; padding: 13px 18px;
+    font-size: 1rem;
+  }
+  .callout.big { font-size: 1.22rem; }
+  .callout strong { color: var(--accent); }
+  @media (prefers-color-scheme: dark) { .callout code { background: rgba(255,255,255,0.1); } }
+
+  h3.sub {
+    margin: 0 0 8px; font-size: 0.72rem; text-transform: uppercase;
+    letter-spacing: 0.09em; color: var(--accent);
+  }
+
+  /* ---- diagrams and charts ---- */
+  /* the diagrams are 720-wide viewBoxes ranging 118..396 tall; letting the <svg> fill a
+     flex-sized box and letterbox itself (viewBox + default xMidYMid meet) is what keeps
+     the tallest of them - architecture's 720x396 - inside the slide. */
+  .diagram { flex: 1 1 auto; min-height: 0; display: flex; justify-content: center; }
+  .diagram svg { width: 100%; height: 100%; display: block; }
+  figure { margin: 0; }
+  .chart { flex: 1 1 auto; min-height: 0; display: flex; align-items: center; justify-content: center; }
+  .chart img {
+    max-width: 100%; max-height: 100%;
+    border: 1px solid var(--border); border-radius: 8px; background: #fff;
+  }
+  .two-col .chart img { max-height: 430px; }
+
+  /* two figures side by side, captioned. The height caps are what keep each pair inside
+     the 720px slide: the UI screenshots are ~1.28:1, the sweep curves 1.6:1. */
+  .pair { display: grid; grid-template-columns: 1fr 1fr; gap: 12px 24px; justify-items: center; }
+  .pair figure { display: flex; flex-direction: column; align-items: center; gap: 6px; min-width: 0; }
+  .pair img {
+    max-width: 100%; border: 1px solid var(--border); border-radius: 6px; background: #fff;
+  }
+  .pair figcaption {
+    font-size: 0.78rem; color: var(--muted); text-align: center;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  .pair figcaption b { color: var(--accent); font-weight: 600; }
+  /* caps sized against the remaining body height once the captions, the table/cards and
+     the closing note are accounted for - shots are ~1.28:1, curves 1.6:1 */
+  .pair.shots img { max-height: 262px; background: #14161c; }
+  .pair.curves img { max-height: 214px; }
+
+  /* ---- tables ---- */
+  table.data { width: 100%; border-collapse: collapse; font-size: 0.92rem; }
+  table.data th, table.data td {
+    padding: 8px 12px; border-bottom: 1px solid var(--border);
+    text-align: left; vertical-align: top;
+  }
+  table.data thead th {
+    font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.07em;
+    color: var(--muted); font-weight: 600;
+  }
+  table.data thead th:not(:first-child), table.data tbody td:not(:first-child) { text-align: right; }
+  table.data.compact { font-size: 0.85rem; }
+  table.data.compact th, table.data.compact td { padding: 6px 10px; }
+  table.data.compact tbody th { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-weight: 600; font-size: 0.86em; }
+  table.data.compact td:not(:first-child), table.data.compact th:not(:first-child) { text-align: left; }
+  table.data.compact thead th:not(:first-child), table.data.compact tbody td:nth-child(n+2) { text-align: left; }
+  table.headline { font-size: 1rem; }
+  table.headline tbody td:first-child { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 0.88em; }
+  tr.win td, td.win, th.win { color: var(--accent); font-weight: 600; }
+  tr.win td:first-child { font-weight: 600; }
+  .muted { color: var(--muted); }
+  .tag {
+    display: inline-block; margin-left: 6px; padding: 1px 7px;
+    border-radius: 99px; background: var(--car-soft); color: var(--car);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    font-size: 0.68rem; letter-spacing: 0.04em; font-weight: 600; vertical-align: 1px;
+  }
+
+  /* ---- layout helpers ---- */
+  .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; align-items: center; min-height: 0; }
+  .two-col.wide-left { grid-template-columns: 1.45fr 1fr; }
+  .two-col > * { min-width: 0; }
+
+  ol.next { margin: 0; padding-left: 1.3em; font-size: 0.97rem; }
+  ol.next li { margin-bottom: 12px; }
+  ul.ticks { margin: 0; padding-left: 1.1em; font-size: 0.95rem; color: var(--muted); }
+  ul.ticks li { margin-bottom: 8px; }
+  ul.ticks.tight { font-size: 0.88rem; }
+  ul.ticks.tight li { margin-bottom: 6px; }
+
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; }
+  .chips span {
+    padding: 5px 11px; border-radius: 99px;
+    border: 1px solid var(--border); background: var(--panel);
+    font-size: 0.82rem; color: var(--muted);
+  }
+  .grid-line {
+    background: var(--mono-bg); border-radius: 8px; padding: 12px 16px;
+    font-size: 1.02rem; text-align: center;
+  }
+  .grid-line strong { color: var(--accent); }
+
+  .separation { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+  .sep-card {
+    background: var(--panel); border: 1px solid var(--border);
+    border-radius: 10px; padding: 16px 18px;
+  }
+  .sep-card h3 {
+    margin: 0 0 8px; font-size: 0.86rem; font-weight: 600;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    color: var(--car); line-height: 1.4;
+  }
+  .sep-card p { font-size: 0.9rem; color: var(--muted); }
+  .sep-card .delta {
+    margin-top: 10px; color: var(--accent); font-weight: 600; font-size: 0.95rem;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+
+  .trades { display: grid; grid-template-columns: 1fr 1fr; gap: 16px 22px; }
+  .trade h3 { margin: 0 0 5px; font-size: 0.97rem; font-weight: 600; }
+  .trade p { font-size: 0.87rem; color: var(--muted); }
+  .trade .why { margin-top: 4px; color: var(--accent); font-size: 0.83rem; }
+
+  /* ---- chrome ---- */
+  #mode {
+    position: fixed; top: 12px; right: 14px; z-index: 5;
+    padding: 4px 11px; border-radius: 99px;
+    background: var(--accent); color: #fff;
+    font-size: 0.7rem; letter-spacing: 0.06em; text-transform: uppercase; font-weight: 600;
+    opacity: 0; transition: opacity 0.25s;
+  }
+  #mode.on { opacity: 1; }
+  #help {
+    position: fixed; bottom: 10px; left: 14px; z-index: 5;
+    color: var(--muted); font-size: 0.68rem; letter-spacing: 0.05em;
+    opacity: 0.55;
+  }
+  #help kbd {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    background: var(--mono-bg); border: 1px solid var(--border);
+    border-radius: 3px; padding: 0 4px;
+  }
+
+  /* ---- print: one slide per page, for a PDF fallback ---- */
+  @page { size: 1280px 720px; margin: 0; }
+  @media print {
+    body { overflow: visible; background: #fff; }
+    #viewport { position: static; display: block; }
+    #frame { width: 1280px; height: auto; transform: none; }
+    #mode, #help { display: none; }
+    .slide {
+      position: static; display: flex !important;
+      width: 1280px; height: 720px;
+      border: none; border-radius: 0;
+      break-after: page; page-break-after: always;
+    }
+  }
+</style>
+</head>
+<body>
+
+<div id="viewport"><div id="frame">
+<section class="slide" data-track="core" data-section="1">
+  <header><h2>Elevator System Simulation</h2></header>
+  <div class="body">
+<p class="lede">A discrete-time simulation of an intelligent elevator system &mdash; two
+pluggable layers over a fixed engine.</p>
+<table class="data headline">
+  <thead><tr><th>62 requests &middot; 50 floors &middot; 6 cars &middot; capacity 10</th>
+  <th>avg wait</th><th>max wait</th><th>avg total</th></tr></thead>
+  <tbody>
+    <tr><td>round_robin + look <span class="tag">baseline</span></td>
+        <td>22.1</td><td>81</td><td>55.5</td></tr>
+    <tr class="win"><td>destination_dispatch + bounded_detour <span class="tag">default</span></td>
+        <td>4.9</td><td>28</td><td>36.8</td></tr>
+  </tbody>
+</table>
+<p class="callout big"><strong>&minus;78%</strong> average wait &nbsp;&middot;&nbsp;
+<strong>&minus;65%</strong> worst case &nbsp;&mdash;&nbsp; identical input, one thing changed.</p>
+<p class="foot-note">How, why &mdash; and where it doesn't hold.</p>
+</div>
+  <footer><span class="stamp">&sect;1</span><span class="count"></span></footer>
+</section>
+
+<section class="slide" data-track="core" data-section="2">
+  <header><p class="kicker">sample_full_day_skyscraper50</p><h2>Side by side, one run</h2></header>
+  <div class="body">
+<div class="pair shots">
+  <figure>
+    <img src="../analysis/figures/round_robin.png"
+         alt="Playback of round_robin + look: six elevator traces criss-crossing the building">
+    <figcaption>round_robin + look &mdash; wait <b>0 / 22.1 / 81</b></figcaption>
+  </figure>
+  <figure>
+    <img src="../analysis/figures/destination_dispatch.png"
+         alt="Playback of destination_dispatch + bounded_detour: longer committed sweeps, fewer crossings">
+    <figcaption>destination_dispatch + bounded_detour &mdash; wait <b>0 / 4.9 / 28</b></figcaption>
+  </figure>
+</div>
+<table class="data compact">
+  <thead><tr><th>62 requests &middot; 50 floors &middot; 6 cars &middot; capacity 10</th>
+  <th>avg wait</th><th>max wait</th><th>avg total</th><th>drift avg / max</th></tr></thead>
+  <tbody>
+    <tr><td>round_robin + scan</td><td>25.7</td><td>81</td><td>64.2</td><td>13.8 / 74</td></tr>
+    <tr><td>round_robin + look</td><td>22.1</td><td>81</td><td>55.5</td><td>9.6 / 68</td></tr>
+    <tr class="win"><td>destination_dispatch + bounded_detour</td><td>4.9</td><td>28</td>
+        <td>36.8</td><td>0.13 / 6</td></tr>
+  </tbody>
+</table>
+<p class="note">One variable changed. Averages <strong>understate</strong> the detour policy &mdash; it
+moves the <strong>tail</strong>, not the mean, so the column to read is <strong>max wait: 81 &rarr; 28</strong>.</p>
+</div>
+  <footer><span class="stamp">&sect;2</span><span class="count"></span></footer>
+</section>
+
+<section class="slide" data-track="core" data-section="3">
+  <header><p class="kicker">architecture</p><h2>Two layers, two questions</h2></header>
+  <div class="body"><div class="diagram"><svg viewBox="0 0 720 396" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="A request falls through the scheduler layer, which picks a car, then the car policy layer, which decides which way that car moves; the engine underneath owns boarding, capacity, timing and logging">
+<defs>
+<marker id="down" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+  <path d="M0,0 L10,5 L0,10 z" fill="var(--muted)"></path>
+</marker>
+</defs>
+<!-- the incoming request -->
+<rect x="248" y="0" width="224" height="30" rx="8" fill="var(--panel)" stroke="var(--border)"></rect>
+<text x="360" y="20" text-anchor="middle" font-size="11.5" fill="var(--text)" font-family="ui-monospace, Menlo, Consolas, monospace">request &mdash; 5 &rarr; 9 at t=12</text>
+<line x1="360" y1="30" x2="360" y2="52" stroke="var(--muted)" stroke-width="1.5" marker-end="url(#down)"></line>
+<!-- ============ layer 1: which car? ============ -->
+<rect x="0" y="56" width="720" height="120" rx="10" fill="var(--accent-soft)" stroke="var(--accent)"></rect>
+<text x="18" y="78" font-size="11" fill="var(--accent)" font-family="ui-monospace, Menlo, Consolas, monospace">LAYER 1 &mdash; schedulers/</text>
+<text x="18" y="101" font-size="15" fill="var(--text)" font-weight="600">Which elevator takes this request?</text>
+<rect x="18" y="112" width="440" height="24" rx="5" fill="var(--panel)" stroke="var(--border)"></rect>
+<text x="30" y="128" font-size="10.5" fill="var(--text)" font-family="ui-monospace, Menlo, Consolas, monospace">assign(request, elevators, t, floors) &rarr; (elevator_id, eta)</text>
+<text x="18" y="156" font-size="11" fill="var(--muted)">Not its job: how that car then moves, or whether it has room.</text>
+<text x="702" y="101" text-anchor="end" font-size="11" fill="var(--accent)" font-family="ui-monospace, Menlo, Consolas, monospace">round_robin</text>
+<text x="702" y="120" text-anchor="end" font-size="11" fill="var(--accent)" font-family="ui-monospace, Menlo, Consolas, monospace">destination_dispatch</text>
+<text x="702" y="156" text-anchor="end" font-size="10.5" fill="var(--muted)">2 implementations</text>
+<line x1="360" y1="176" x2="360" y2="206" stroke="var(--muted)" stroke-width="1.5" marker-end="url(#down)"></line>
+<text x="372" y="196" font-size="11" fill="var(--muted)">the chosen car gains a committed stop</text>
+<!-- ============ layer 2: which way? ============ -->
+<rect x="0" y="210" width="720" height="120" rx="10" fill="var(--car-soft)" stroke="var(--car)"></rect>
+<text x="18" y="232" font-size="11" fill="var(--car)" font-family="ui-monospace, Menlo, Consolas, monospace">LAYER 2 &mdash; car_policies/</text>
+<text x="18" y="255" font-size="15" fill="var(--text)" font-weight="600">Which way does that car move this tick?</text>
+<rect x="18" y="266" width="440" height="24" rx="5" fill="var(--panel)" stroke="var(--border)"></rect>
+<text x="30" y="282" font-size="10.5" fill="var(--text)" font-family="ui-monospace, Menlo, Consolas, monospace">next_direction(elevator, t, floors) &rarr; UP | DOWN | IDLE</text>
+<text x="18" y="310" font-size="11" fill="var(--muted)">Not its job: which requests it was given, or whether it has room.</text>
+<text x="702" y="248" text-anchor="end" font-size="11" fill="var(--car)" font-family="ui-monospace, Menlo, Consolas, monospace">scan</text>
+<text x="702" y="267" text-anchor="end" font-size="11" fill="var(--car)" font-family="ui-monospace, Menlo, Consolas, monospace">look</text>
+<text x="702" y="286" text-anchor="end" font-size="11" fill="var(--car)" font-family="ui-monospace, Menlo, Consolas, monospace">bounded_detour</text>
+<text x="702" y="310" text-anchor="end" font-size="10.5" fill="var(--muted)">3 implementations</text>
+<!-- ============ everything else ============ -->
+<rect x="0" y="344" width="720" height="48" rx="10" fill="var(--panel)" stroke="var(--border)" stroke-dasharray="5,4"></rect>
+<text x="18" y="365" font-size="11" fill="var(--muted)" font-family="ui-monospace, Menlo, Consolas, monospace">core/engine.py</text>
+<text x="18" y="383" font-size="11.5" fill="var(--text)">Owns everything else: boarding, capacity, the clock, and the position log.</text>
+</svg></div>
+<p class="note">The handover between the layers is <strong>one committed stop</strong> &mdash;
+nothing richer. Any scheduler composes with any car policy, and a change to one cannot
+quietly alter the other.</p>
+</div>
+  <footer><span class="stamp">&sect;3</span><span class="count"></span></footer>
+</section>
+
+<section class="slide" data-track="ext" data-section="3">
+  <header><p class="kicker">architecture</p><h2>One tick, four steps</h2></header>
+  <div class="body"><div class="diagram"><svg viewBox="0 0 720 210" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="The four steps of one tick: release and assign calls the scheduler, board and drop off is the engine, log positions is the engine, move one floor calls the car policy">
+<defs>
+<marker id="next" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+  <path d="M0,0 L10,5 L0,10 z" fill="var(--muted)"></path>
+</marker>
+</defs>
+<text x="0" y="13" font-size="11" fill="var(--muted)" font-family="ui-monospace, Menlo, Consolas, monospace">EVERY TICK, IN THIS ORDER &mdash; core/engine.py run()</text>
+<!-- step 1: scheduler -->
+<rect x="0" y="28" width="164" height="86" rx="9" fill="var(--accent-soft)" stroke="var(--accent)"></rect>
+<text x="82" y="50" text-anchor="middle" font-size="16" fill="var(--accent)" font-weight="600" font-family="ui-monospace, Menlo, Consolas, monospace">1</text>
+<text x="82" y="71" text-anchor="middle" font-size="11.5" fill="var(--text)" font-weight="600">release &amp; assign</text>
+<text x="82" y="90" text-anchor="middle" font-size="10.5" fill="var(--accent)" font-family="ui-monospace, Menlo, Consolas, monospace">&rarr; LAYER 1</text>
+<text x="82" y="106" text-anchor="middle" font-size="10" fill="var(--muted)">one batch per tick</text>
+<line x1="168" y1="71" x2="180" y2="71" stroke="var(--muted)" stroke-width="1.5" marker-end="url(#next)"></line>
+<!-- step 2: engine -->
+<rect x="185" y="28" width="164" height="86" rx="9" fill="var(--panel)" stroke="var(--border)"></rect>
+<text x="267" y="50" text-anchor="middle" font-size="16" fill="var(--muted)" font-weight="600" font-family="ui-monospace, Menlo, Consolas, monospace">2</text>
+<text x="267" y="71" text-anchor="middle" font-size="11.5" fill="var(--text)" font-weight="600">board &amp; drop off</text>
+<text x="267" y="90" text-anchor="middle" font-size="10.5" fill="var(--muted)" font-family="ui-monospace, Menlo, Consolas, monospace">engine</text>
+<text x="267" y="106" text-anchor="middle" font-size="10" fill="var(--accent)">capacity enforced here</text>
+<line x1="353" y1="71" x2="365" y2="71" stroke="var(--muted)" stroke-width="1.5" marker-end="url(#next)"></line>
+<!-- step 3: engine -->
+<rect x="370" y="28" width="164" height="86" rx="9" fill="var(--panel)" stroke="var(--border)"></rect>
+<text x="452" y="50" text-anchor="middle" font-size="16" fill="var(--muted)" font-weight="600" font-family="ui-monospace, Menlo, Consolas, monospace">3</text>
+<text x="452" y="71" text-anchor="middle" font-size="11.5" fill="var(--text)" font-weight="600">log positions</text>
+<text x="452" y="90" text-anchor="middle" font-size="10.5" fill="var(--muted)" font-family="ui-monospace, Menlo, Consolas, monospace">engine</text>
+<text x="452" y="106" text-anchor="middle" font-size="10" fill="var(--muted)">one row per tick</text>
+<line x1="538" y1="71" x2="550" y2="71" stroke="var(--muted)" stroke-width="1.5" marker-end="url(#next)"></line>
+<!-- step 4: car policy -->
+<rect x="556" y="28" width="164" height="86" rx="9" fill="var(--car-soft)" stroke="var(--car)"></rect>
+<text x="638" y="50" text-anchor="middle" font-size="16" fill="var(--car)" font-weight="600" font-family="ui-monospace, Menlo, Consolas, monospace">4</text>
+<text x="638" y="71" text-anchor="middle" font-size="11.5" fill="var(--text)" font-weight="600">move one floor</text>
+<text x="638" y="90" text-anchor="middle" font-size="10.5" fill="var(--car)" font-family="ui-monospace, Menlo, Consolas, monospace">&rarr; LAYER 2</text>
+<text x="638" y="106" text-anchor="middle" font-size="10" fill="var(--muted)">each car, every tick</text>
+<!-- loop back -->
+<path d="M638,118 L638,146 L82,146 L82,120" fill="none" stroke="var(--muted)" stroke-width="1.5" stroke-dasharray="4,4" marker-end="url(#next)"></path>
+<text x="360" y="164" text-anchor="middle" font-size="11" fill="var(--muted)">repeat until every passenger has a dropoff time</text>
+<text x="360" y="196" text-anchor="middle" font-size="11.5" fill="var(--accent)">The two coloured steps are the only places a pluggable layer is called.</text>
+</svg></div>
+<p class="note">One tick = one floor. Boarding is instantaneous &mdash; which is why a car's
+arrival time is pure geometry, the property <code>core/trip_estimator.py</code> is built on.</p>
+</div>
+  <footer><span class="stamp">&sect;3</span><span class="count"></span></footer>
+</section>
+
+<section class="slide" data-track="core" data-section="4">
+  <header><p class="kicker">the menu</p><h2>What plugs in</h2></header>
+  <div class="body"><div class="diagram"><svg viewBox="0 0 720 196" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="A two by three grid of every scheduler and car policy combination, with destination dispatch plus bounded detour marked as the default">
+<text x="0" y="13" font-size="11" fill="var(--muted)" font-family="ui-monospace, Menlo, Consolas, monospace">EVERY COMBINATION RUNS &mdash; 2 SCHEDULERS &times; 3 CAR POLICIES</text>
+<g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="11" fill="var(--car)">
+<text x="300" y="44" text-anchor="middle">scan</text>
+<text x="440" y="44" text-anchor="middle">look</text>
+<text x="590" y="44" text-anchor="middle">bounded_detour</text>
+</g>
+<g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="11" fill="var(--accent)" text-anchor="end">
+<text x="212" y="80">round_robin</text>
+<text x="212" y="140">destination_dispatch</text>
+</g>
+<!-- row 1 -->
+<rect x="228" y="56" width="144" height="34" rx="7" fill="var(--panel)" stroke="var(--border)"></rect>
+<rect x="380" y="56" width="144" height="34" rx="7" fill="var(--panel)" stroke="var(--border)"></rect>
+<rect x="532" y="56" width="188" height="34" rx="7" fill="var(--panel)" stroke="var(--border)"></rect>
+<!-- row 2 -->
+<rect x="228" y="116" width="144" height="34" rx="7" fill="var(--panel)" stroke="var(--border)"></rect>
+<rect x="380" y="116" width="144" height="34" rx="7" fill="var(--panel)" stroke="var(--border)"></rect>
+<rect x="532" y="116" width="188" height="34" rx="7" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="2"></rect>
+<text x="626" y="138" text-anchor="middle" font-size="11" fill="var(--accent)" font-family="ui-monospace, Menlo, Consolas, monospace">the default</text>
+<text x="360" y="182" text-anchor="middle" font-size="11.5" fill="var(--muted)">Because the layers never reach into each other, all six are valid &mdash; and <tspan font-family="ui-monospace, Menlo, Consolas, monospace">analysis/</tspan> sweeps every one.</text>
+</svg></div>
+<table class="data compact">
+  <tbody>
+    <tr><th>round_robin</th><td>naive baseline &mdash; no notion of position, queue or capacity</td>
+        <th>scan</th><td>true SCAN &mdash; runs to the building's end before reversing</td></tr>
+    <tr><th class="win">destination_dispatch</th><td>scores whole-trip cost using the destination</td>
+        <th>look</th><td>reverses as soon as nothing remains ahead</td></tr>
+    <tr><th>express</th><td>implemented, not wired into the CLI</td>
+        <th class="win">bounded_detour</th><td>LOOK + bounded turn-backs</td></tr>
+    <tr><th>zone_based</th><td class="muted">stub</td>
+        <th>fcfs</th><td class="muted">stub</td></tr>
+  </tbody>
+</table>
+<p class="note"><code>scan</code> is deliberately still here: it is the weakest policy, and the
+control that proves the fairness weight is doing real work.</p>
+</div>
+  <footer><span class="stamp">&sect;4</span><span class="count"></span></footer>
+</section>
+
+<section class="slide" data-track="core" data-section="5">
+  <header><p class="kicker">destination dispatch</p><h2>The cost of a candidate car</h2></header>
+  <div class="body"><div class="diagram"><svg viewBox="0 0 720 166" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Cost function: W_WAIT 1.0 times ticks to pickup, plus W_TRAVEL 0.25 times ride time, plus W_FAIRNESS 0.25 times the delay imposed on existing passengers">
+<text x="0" y="13" font-size="11" fill="var(--muted)" font-family="ui-monospace, Menlo, Consolas, monospace">COST OF GIVING THIS REQUEST TO THIS CAR</text>
+<rect x="0" y="26" width="224" height="100" rx="9" fill="var(--car-soft)" stroke="var(--car)"></rect>
+<text x="112" y="46" text-anchor="middle" font-size="10.5" fill="var(--muted)" font-family="ui-monospace, Menlo, Consolas, monospace">W_WAIT</text>
+<text x="112" y="72" text-anchor="middle" font-size="18" fill="var(--car)" font-weight="600" font-family="ui-monospace, Menlo, Consolas, monospace">&times; 1.0</text>
+<text x="112" y="94" text-anchor="middle" font-size="11" fill="var(--text)" font-family="ui-monospace, Menlo, Consolas, monospace">ticks_to_pickup</text>
+<text x="112" y="114" text-anchor="middle" font-size="11" fill="var(--muted)">time spent waiting</text>
+<text x="236" y="82" text-anchor="middle" font-size="17" fill="var(--muted)">+</text>
+<rect x="248" y="26" width="224" height="100" rx="9" fill="var(--car-soft)" stroke="var(--car)"></rect>
+<text x="360" y="46" text-anchor="middle" font-size="10.5" fill="var(--muted)" font-family="ui-monospace, Menlo, Consolas, monospace">W_TRAVEL</text>
+<text x="360" y="72" text-anchor="middle" font-size="18" fill="var(--car)" font-weight="600" font-family="ui-monospace, Menlo, Consolas, monospace">&times; 0.25</text>
+<text x="360" y="94" text-anchor="middle" font-size="11" fill="var(--text)" font-family="ui-monospace, Menlo, Consolas, monospace">ride time</text>
+<text x="360" y="114" text-anchor="middle" font-size="11" fill="var(--muted)">pickup &rarr; dropoff</text>
+<text x="484" y="82" text-anchor="middle" font-size="17" fill="var(--muted)">+</text>
+<rect x="496" y="26" width="224" height="100" rx="9" fill="var(--accent-soft)" stroke="var(--accent)"></rect>
+<text x="608" y="46" text-anchor="middle" font-size="10.5" fill="var(--accent)" font-family="ui-monospace, Menlo, Consolas, monospace">W_FAIRNESS</text>
+<text x="608" y="72" text-anchor="middle" font-size="18" fill="var(--accent)" font-weight="600" font-family="ui-monospace, Menlo, Consolas, monospace">&times; 0.25</text>
+<text x="608" y="94" text-anchor="middle" font-size="11" fill="var(--text)" font-family="ui-monospace, Menlo, Consolas, monospace">delay_imposed</text>
+<text x="608" y="114" text-anchor="middle" font-size="11" fill="var(--muted)">what everyone else pays</text>
+<text x="360" y="154" text-anchor="middle" font-size="11.5" fill="var(--accent)">Lowest total wins &mdash; and only the third term needs to know the destination.</text>
+</svg></div>
+<p class="note">Every term is an <strong>exact closed form</strong> from
+<code>core/trip_estimator.py</code> &mdash; candidate cars are scored with arithmetic, not with a
+simulated run.</p>
+</div>
+  <footer><span class="stamp">&sect;5</span><span class="count"></span></footer>
+</section>
+
+<section class="slide" data-track="core" data-section="5">
+  <header><p class="kicker">destination dispatch</p><h2>Why the third term decides it</h2></header>
+  <div class="body"><div class="diagram"><svg viewBox="0 0 720 315" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Two candidate cars scored for one 5 to 9 request: E1's committed sweep already spans it, while E2 must extend its sweep and delay a passenger waiting behind it">
+<text x="0" y="16" font-size="11" fill="var(--muted)" font-family="ui-monospace, Menlo, Consolas, monospace">ONE REQUEST &mdash; 5 &rarr; 9 &mdash; SCORED AGAINST TWO CARS (floor axis, not time)</text>
+<!-- floor gridlines, floors 1-10 at x = 120 + (f-1)*49 -->
+<g stroke="var(--border)">
+<line x1="120" y1="40" x2="120" y2="252"></line>
+<line x1="169" y1="40" x2="169" y2="252"></line>
+<line x1="218" y1="40" x2="218" y2="252"></line>
+<line x1="267" y1="40" x2="267" y2="252"></line>
+<line x1="316" y1="40" x2="316" y2="252"></line>
+<line x1="365" y1="40" x2="365" y2="252"></line>
+<line x1="414" y1="40" x2="414" y2="252"></line>
+<line x1="463" y1="40" x2="463" y2="252"></line>
+<line x1="512" y1="40" x2="512" y2="252"></line>
+<line x1="561" y1="40" x2="561" y2="252"></line>
+</g>
+<g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="11" fill="var(--muted)">
+<text x="120" y="268" text-anchor="middle">1</text>
+<text x="169" y="268" text-anchor="middle">2</text>
+<text x="218" y="268" text-anchor="middle">3</text>
+<text x="267" y="268" text-anchor="middle">4</text>
+<text x="316" y="268" text-anchor="middle">5</text>
+<text x="365" y="268" text-anchor="middle">6</text>
+<text x="414" y="268" text-anchor="middle">7</text>
+<text x="463" y="268" text-anchor="middle">8</text>
+<text x="512" y="268" text-anchor="middle">9</text>
+<text x="561" y="268" text-anchor="middle">10</text>
+<text x="0" y="268">FLOOR</text>
+</g>
+<!-- ===== E1: the trip nests inside a sweep it already runs ===== -->
+<g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="12">
+<text x="0" y="86" fill="var(--car)" font-size="13">E1</text>
+<text x="0" y="102" fill="var(--muted)" font-size="11">at 3, up</text>
+ <rect x="218" y="74" width="343" height="16" rx="5" fill="var(--car-soft)" stroke="var(--car)"></rect>
+<text x="389" y="66" text-anchor="middle" font-size="11" fill="var(--car)">already sweeping 3 &rarr; 10</text>
+<circle cx="218" cy="82" r="5" fill="var(--car)"></circle>
+ <line x1="316" y1="112" x2="512" y2="112" stroke="var(--accent)" stroke-width="3"></line>
+<circle cx="316" cy="112" r="4" fill="var(--accent)"></circle>
+<circle cx="512" cy="112" r="4" fill="var(--accent)"></circle>
+<text x="389" y="130" text-anchor="middle" font-size="11" fill="var(--accent)">fits inside &mdash; costs nobody anything</text>
+</g>
+<line x1="0" y1="150" x2="720" y2="150" stroke="var(--border)"></line>
+<!-- ===== E2: nearer the pickup, but the trip drags its sweep out ===== -->
+<g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="12">
+<text x="0" y="196" fill="var(--car)" font-size="13">E2</text>
+<text x="0" y="212" fill="var(--muted)" font-size="11">at 4, up</text>
+ <circle cx="120" cy="192" r="5" fill="var(--muted)"></circle>
+<text x="120" y="178" text-anchor="middle" font-size="11" fill="var(--muted)">waiting</text>
+ <rect x="267" y="184" width="98" height="16" rx="5" fill="var(--car-soft)" stroke="var(--car)"></rect>
+<text x="316" y="176" text-anchor="middle" font-size="11" fill="var(--car)">sweeping 4 &rarr; 6</text>
+<circle cx="267" cy="192" r="5" fill="var(--car)"></circle>
+ <rect x="365" y="184" width="147" height="16" rx="5" fill="var(--accent-soft)" stroke="var(--accent)" stroke-dasharray="4,3"></rect>
+<text x="438" y="176" text-anchor="middle" font-size="11" fill="var(--accent)">dragged out to 9</text>
+ <line x1="316" y1="222" x2="512" y2="222" stroke="var(--accent)" stroke-width="3"></line>
+<circle cx="316" cy="222" r="4" fill="var(--accent)"></circle>
+<circle cx="512" cy="222" r="4" fill="var(--accent)"></circle>
+<text x="414" y="240" text-anchor="middle" font-size="11" fill="var(--accent)">+3 floors &rarr; the passenger at 1 pays 2 &times; 3 = 6 ticks</text>
+</g>
+<!-- ===== verdict ===== -->
+<g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="11">
+<text x="0" y="296" fill="var(--car)">E1: 2 + 0.25&times;4 + 0 = 3.00</text>
+<text x="250" y="296" fill="var(--muted)">E2: 1 + 0.25&times;4 + 0.25&times;6 = 3.50</text>
+<text x="500" y="296" fill="var(--accent)">&rarr; E1 wins, though E2 is nearer</text>
+</g>
+</svg></div>
+<p class="note">A nearest-car scheduler takes the closer car and drags its reversal point out.
+<strong>Only a scheduler that knows the destination up front can tell those two apart.</strong></p>
+</div>
+  <footer><span class="stamp">&sect;5</span><span class="count"></span></footer>
+</section>
+
+<section class="slide" data-track="ext" data-section="5">
+  <header><p class="kicker">destination dispatch</p><h2>What the car's queue hides</h2></header>
+  <div class="body"><div class="diagram"><svg viewBox="0 0 720 186" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Table showing that between assignment and boarding, the engine's stop queue holds only the source floor, while the scheduler's pledge ledger holds the destination">
+<g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="11" fill="var(--muted)">
+<text x="255" y="18" text-anchor="middle">t0 &middot; assigned</text>
+<text x="450" y="18" text-anchor="middle">t3 &middot; boards at 1</text>
+<text x="645" y="18" text-anchor="middle">t9 &middot; arrives at 15</text>
+</g>
+<g font-size="11.5" fill="var(--muted)" text-anchor="end">
+<text x="150" y="50">engine stop_queue</text>
+<text x="150" y="92">pledge ledger</text>
+<text x="150" y="134">really committed</text>
+</g>
+<g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="12" text-anchor="middle">
+<!-- row 1: what core/engine.py actually holds -->
+<rect x="165" y="30" width="180" height="28" rx="6" fill="var(--panel)" stroke="var(--border)"></rect>
+<text x="255" y="49" fill="var(--text)">{ 1 }</text>
+<rect x="360" y="30" width="180" height="28" rx="6" fill="var(--panel)" stroke="var(--border)"></rect>
+<text x="450" y="49" fill="var(--text)">{ 15 }</text>
+<rect x="555" y="30" width="180" height="28" rx="6" fill="var(--panel)" stroke="var(--border)"></rect>
+<text x="645" y="49" fill="var(--muted)">{ }</text>
+ <!-- row 2: the gap the ledger fills -->
+<rect x="165" y="72" width="180" height="28" rx="6" fill="var(--accent-soft)" stroke="var(--accent)"></rect>
+<text x="255" y="91" fill="var(--accent)">{ 15 }</text>
+<rect x="360" y="72" width="180" height="28" rx="6" fill="var(--panel)" stroke="var(--border)" stroke-dasharray="4,3"></rect>
+<text x="450" y="91" fill="var(--muted)">{ }</text>
+<rect x="555" y="72" width="180" height="28" rx="6" fill="var(--panel)" stroke="var(--border)" stroke-dasharray="4,3"></rect>
+<text x="645" y="91" fill="var(--muted)">{ }</text>
+ <!-- row 3: the union, which is what gets scored -->
+<rect x="165" y="114" width="180" height="28" rx="6" fill="var(--car-soft)" stroke="var(--car)"></rect>
+<text x="255" y="133" fill="var(--car)">{ 1, 15 }</text>
+<rect x="360" y="114" width="180" height="28" rx="6" fill="var(--car-soft)" stroke="var(--car)"></rect>
+<text x="450" y="133" fill="var(--car)">{ 15 }</text>
+<rect x="555" y="114" width="180" height="28" rx="6" fill="var(--car-soft)" stroke="var(--car)"></rect>
+<text x="645" y="133" fill="var(--muted)">{ }</text>
+</g>
+<text x="360" y="172" text-anchor="middle" font-size="11.5" fill="var(--accent)">The ledger covers exactly the window where the engine doesn't.</text>
+</svg></div>
+<p class="note">Closed with a <strong>pledge ledger</strong> inside the scheduler rather than by
+changing the engine. Same-tick requests interact too, so a whole tick is placed by
+<strong>cheapest insertion</strong> &mdash; greedy, not globally optimal, and affordable because every
+evaluation is arithmetic.</p>
+</div>
+  <footer><span class="stamp">&sect;5</span><span class="count"></span></footer>
+</section>
+
+<section class="slide" data-track="core" data-section="5">
+  <header><p class="kicker">destination dispatch</p><h2>The receipt</h2></header>
+  <div class="body"><div class="diagram"><svg viewBox="0 0 720 180" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Bar chart: average wait falls from 22.1 to 5.3 ticks, max wait from 81 to 28, and estimate drift from 9.6 to 0.2">
+<text x="0" y="13" font-size="11" fill="var(--muted)" font-family="ui-monospace, Menlo, Consolas, monospace">sample_full_day_skyscraper50 &middot; 6 cars &middot; capacity 10 &middot; look policy</text>
+<rect x="440" y="5" width="10" height="10" rx="2" fill="var(--muted)" opacity="0.55"></rect>
+<text x="456" y="14" font-size="11" fill="var(--muted)">round_robin</text>
+<rect x="560" y="5" width="10" height="10" rx="2" fill="var(--car)"></rect>
+<text x="576" y="14" font-size="11" fill="var(--muted)">destination_dispatch</text>
+<g font-size="11.5" fill="var(--muted)" text-anchor="end">
+<text x="150" y="56">avg wait</text>
+<text x="150" y="106">max wait</text>
+<text x="150" y="156">estimate drift</text>
+</g>
+<g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="11">
+<rect x="165" y="34" width="420" height="16" rx="4" fill="var(--muted)" opacity="0.4"></rect>
+<text x="593" y="46" fill="var(--muted)">22.1</text>
+<rect x="165" y="54" width="101" height="16" rx="4" fill="var(--car)"></rect>
+<text x="274" y="66" fill="var(--car)">5.3</text>
+ <rect x="165" y="84" width="420" height="16" rx="4" fill="var(--muted)" opacity="0.4"></rect>
+<text x="593" y="96" fill="var(--muted)">81</text>
+<rect x="165" y="104" width="145" height="16" rx="4" fill="var(--car)"></rect>
+<text x="318" y="116" fill="var(--car)">28</text>
+ <rect x="165" y="134" width="420" height="16" rx="4" fill="var(--muted)" opacity="0.4"></rect>
+<text x="593" y="146" fill="var(--muted)">9.6</text>
+<rect x="165" y="154" width="9" height="16" rx="3" fill="var(--accent)"></rect>
+<text x="182" y="166" fill="var(--accent)">0.2</text>
+</g>
+</svg></div>
+<p class="note"><strong>estimate drift</strong> is the gap between the wait a scheduler promised and
+the wait it delivered: <strong>0.13 average</strong> against round_robin's <strong>9.6</strong>. A computed
+arrival, not a distance guess.</p>
+</div>
+  <footer><span class="stamp">&sect;5</span><span class="count"></span></footer>
+</section>
+
+<section class="slide" data-track="core" data-section="6">
+  <header><p class="kicker">bounded detour</p><h2>Bound the turn-back</h2></header>
+  <div class="body">
+<p class="lede">Plain LOOK is unfair to whoever is standing <em>behind</em> a car that just went by
+&mdash; they wait out the whole remaining sweep plus the return leg. Turning back freely is worse:
+the car thrashes and everyone aboard pays, with no ceiling.</p>
+<div class="diagram"><svg viewBox="0 0 720 150" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Three bounds: D max detour distance, k max detours per sweep, F max fairness delay, combining to a worst case of k times 2D per sweep">
+<text x="0" y="13" font-size="11" fill="var(--muted)" font-family="ui-monospace, Menlo, Consolas, monospace">THREE BOUNDS, ALL THREE MUST PASS</text>
+<rect x="0" y="26" width="224" height="86" rx="9" fill="var(--panel)" stroke="var(--border)"></rect>
+<text x="112" y="54" text-anchor="middle" font-size="19" fill="var(--accent)" font-weight="600" font-family="ui-monospace, Menlo, Consolas, monospace">D</text>
+<text x="112" y="75" text-anchor="middle" font-size="10" fill="var(--muted)" font-family="ui-monospace, Menlo, Consolas, monospace">MAX_DETOUR_DISTANCE</text>
+<text x="112" y="97" text-anchor="middle" font-size="11" fill="var(--text)">how far back it may go</text>
+<rect x="248" y="26" width="224" height="86" rx="9" fill="var(--panel)" stroke="var(--border)"></rect>
+<text x="360" y="54" text-anchor="middle" font-size="19" fill="var(--accent)" font-weight="600" font-family="ui-monospace, Menlo, Consolas, monospace">k</text>
+<text x="360" y="75" text-anchor="middle" font-size="10" fill="var(--muted)" font-family="ui-monospace, Menlo, Consolas, monospace">MAX_DETOURS_PER_SWEEP</text>
+<text x="360" y="97" text-anchor="middle" font-size="11" fill="var(--text)">how many per sweep</text>
+<rect x="496" y="26" width="224" height="86" rx="9" fill="var(--panel)" stroke="var(--border)"></rect>
+<text x="608" y="54" text-anchor="middle" font-size="19" fill="var(--accent)" font-weight="600" font-family="ui-monospace, Menlo, Consolas, monospace">F</text>
+<text x="608" y="75" text-anchor="middle" font-size="10" fill="var(--muted)" font-family="ui-monospace, Menlo, Consolas, monospace">MAX_FAIRNESS_DELAY</text>
+<text x="608" y="97" text-anchor="middle" font-size="11" fill="var(--text)">how much others may lose</text>
+<text x="360" y="138" text-anchor="middle" font-size="11.5" fill="var(--accent)">Worst case per sweep = k &times; 2D &mdash; a guarantee, not a tendency.</text>
+</svg></div>
+<p class="callout">Worst case is exactly <strong>k &middot; 2D = 16 ticks</strong> per sweep for everyone
+aboard &mdash; a guarantee, not a tendency. <code>tests/test_car_policies.py</code> checks it.</p>
+</div>
+  <footer><span class="stamp">&sect;6</span><span class="count"></span></footer>
+</section>
+
+<section class="slide" data-track="ext" data-section="6">
+  <header><p class="kicker">bounded detour</p><h2>One diversion, start to finish</h2></header>
+  <div class="body"><div class="diagram"><svg viewBox="0 0 720 255" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Bounded detour trajectory: a rising car at floor 4 turns back one floor to serve a stop at floor 3, then resumes its climb to floor 6, compared against a dashed plain-LOOK path that finishes the climb first">
+<!-- floor gridlines + labels, floors 1-6 -->
+<g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="11" fill="var(--muted)">
+<line x1="60" y1="40"  x2="640" y2="40"  stroke="var(--border)"></line>
+<text x="48" y="44" text-anchor="end">6</text>
+<line x1="60" y1="70"  x2="640" y2="70"  stroke="var(--border)"></line>
+<text x="48" y="74" text-anchor="end">5</text>
+<line x1="60" y1="100" x2="640" y2="100" stroke="var(--border)"></line>
+<text x="48" y="104" text-anchor="end">4</text>
+<line x1="60" y1="130" x2="640" y2="130" stroke="var(--border)"></line>
+<text x="48" y="134" text-anchor="end">3</text>
+<line x1="60" y1="160" x2="640" y2="160" stroke="var(--border)"></line>
+<text x="48" y="164" text-anchor="end">2</text>
+<line x1="60" y1="190" x2="640" y2="190" stroke="var(--border)"></line>
+<text x="48" y="194" text-anchor="end">1</text>
+<text x="10" y="18" fill="var(--accent)" font-size="12">FLOOR</text>
+</g>
+<!-- ghost path: plain look.py finishes the climb to 6 first, then comes back down to 3 -->
+<polyline points="60,100 176,40 350,130" fill="none" stroke="var(--muted)" stroke-width="2" stroke-dasharray="5,4" opacity="0.7"></polyline>
+<text x="430" y="70" font-size="11" fill="var(--muted)" font-family="ui-monospace, Menlo, Consolas, monospace">plain look.py (dashed)</text>
+<!-- bounded detour: 4 -> 3 -> back to 4 -> on up to 6 -->
+<polyline points="60,100 118,130 176,100 292,40" fill="none" stroke="var(--car)" stroke-width="2.5"></polyline>
+<!-- the diverted stop, and the committed stop at the far end of the sweep -->
+<circle cx="118" cy="130" r="5" fill="var(--accent)"></circle>
+<circle cx="292" cy="40"  r="5" fill="var(--accent)"></circle>
+<text x="118" y="150" text-anchor="middle" font-size="11" fill="var(--accent)" font-family="ui-monospace, Menlo, Consolas, monospace">diverted stop</text>
+<!-- what it costs those already aboard: floor 6 arrives at t4 instead of t2 -->
+<line x1="176" y1="26" x2="292" y2="26" stroke="var(--accent)" stroke-width="1.5"></line>
+<line x1="176" y1="21" x2="176" y2="31" stroke="var(--accent)" stroke-width="1.5"></line>
+<line x1="292" y1="21" x2="292" y2="31" stroke="var(--accent)" stroke-width="1.5"></line>
+<text x="302" y="30" font-size="11" fill="var(--accent)" font-family="ui-monospace, Menlo, Consolas, monospace">costs: floor 6 arrives 2 ticks late = 2 &times; |4 &minus; 3|</text>
+<!-- what it buys: the stop at floor 3 is served at t1 instead of t5 -->
+<line x1="118" y1="208" x2="350" y2="208" stroke="var(--accent)" stroke-width="1.5"></line>
+<line x1="118" y1="203" x2="118" y2="213" stroke="var(--accent)" stroke-width="1.5"></line>
+<line x1="350" y1="203" x2="350" y2="213" stroke="var(--accent)" stroke-width="1.5"></line>
+<text x="234" y="226" text-anchor="middle" font-size="11" fill="var(--accent)" font-family="ui-monospace, Menlo, Consolas, monospace">buys: floor 3 served 4 ticks sooner</text>
+<!-- time axis -->
+<g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="11" fill="var(--muted)">
+<text x="60"  y="248" text-anchor="middle">t0</text>
+<text x="118" y="248" text-anchor="middle">t1</text>
+<text x="176" y="248" text-anchor="middle">t2</text>
+<text x="292" y="248" text-anchor="middle">t4</text>
+<text x="350" y="248" text-anchor="middle">t5</text>
+</g>
+</svg></div>
+<p class="note">A diversion is a sweep extension that <strong>snaps back</strong> instead of persisting
+&mdash; so the car resumes the trajectory it would have taken anyway.</p>
+</div>
+  <footer><span class="stamp">&sect;6</span><span class="count"></span></footer>
+</section>
+
+<section class="slide" data-track="core" data-section="7">
+  <header><p class="kicker">method</p><h2>How I made it measurable</h2></header>
+  <div class="body">
+<p class="lede">No public trace fits the input schema, so every scenario is hand-built to stress
+a <strong>named</strong> failure mode &mdash; not random traffic.</p>
+<div class="chips">
+  <span>up-peak &mdash; single source</span><span>down-peak &mdash; many source</span>
+  <span>lunch rush &mdash; reverse trips</span><span>capacity overload</span>
+  <span>contradictory same-tick pairs</span><span>single-elevator bottleneck</span>
+  <span>quiet / intermittent</span><span>3 full-day composites &mdash; 10 / 35 / 50 floors</span>
+</div>
+<p class="grid-line"><strong>11 scenarios</strong> &times; <strong>1&ndash;10 elevators</strong> &times;
+<strong>capacity 3/5/8/13</strong> &times; <strong>6 pairs</strong> &asymp; <strong>2640 runs</strong>
+in about 30 seconds</p>
+<ul class="ticks">
+  <li><code>wait</code> and <code>total</code> are charted <strong>separately</strong> &mdash; blending them
+      hides the exact trade this project is about.</li>
+  <li>A config that doesn't converge leaves a <strong>gap</strong> in the trace. No fabricated points.</li>
+</ul>
+<p class="foot-note">So nothing after this is one lucky run.</p>
+</div>
+  <footer><span class="stamp">&sect;7</span><span class="count"></span></footer>
+</section>
+
+<section class="slide" data-track="core" data-section="8">
+  <header><p class="kicker">measured, not argued</p><h2>Choosing the weights</h2></header>
+  <div class="body">
+<div class="two-col wide-left">
+<figure class="chart"><img src="../analysis/figures/weight_comparison_wait_time.png" alt="Average wait time per weight preset, grouped by car policy"></figure>
+  <div>
+    <table class="data compact">
+      <thead><tr><th>preset</th><th>wait / travel / fairness</th></tr></thead>
+      <tbody>
+        <tr class="win"><td>default</td><td>1.0 / 0.25 / 0.25</td></tr>
+        <tr><td>ride-heavy</td><td>1.0 / 1.0 / 0.2</td></tr>
+        <tr><td>balanced</td><td>1.0 / 0.5 / 0.5</td></tr>
+        <tr><td>fair</td><td>1.0 / 0.5 / 1.5</td></tr>
+        <tr><td>selfish</td><td>1.0 / 0.5 / 0.0</td></tr>
+      </tbody>
+    </table>
+    <p class="note">5 presets &times; 3 car policies, <strong>1320 runs each</strong>.</p>
+  </div>
+</div>
+<ul class="ticks tight">
+  <li><strong>selfish is the worst</strong> weighting for both <code>look</code> and
+      <code>bounded_detour</code> &mdash; the fairness term earns its place.</li>
+  <li>Margins are small: <strong>which scheduler you pick matters far more than how you weight
+      it.</strong></li>
+</ul>
+</div>
+  <footer><span class="stamp">&sect;8</span><span class="count"></span></footer>
+</section>
+
+<section class="slide" data-track="ext" data-section="8">
+  <header><p class="kicker">measured, not argued</p><h2>Two checks on the weights</h2></header>
+  <div class="body"><div class="diagram"><svg viewBox="0 0 720 118" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Scaling all three weights by the same factor scales the cost by that factor and cannot change which car ranks first">
+<text x="0" y="13" font-size="11" fill="var(--muted)" font-family="ui-monospace, Menlo, Consolas, monospace">SCALING EVERY WEIGHT CHANGES THE NUMBERS, NEVER THE RANKING</text>
+<text x="0" y="46" font-size="11" fill="var(--muted)" font-family="ui-monospace, Menlo, Consolas, monospace">1.0 / 0.25 / 0.25</text>
+<rect x="150" y="34" width="57" height="16" rx="4" fill="var(--car)"></rect>
+<text x="213" y="46" font-size="11" fill="var(--car)" font-family="ui-monospace, Menlo, Consolas, monospace">E1 3.00</text>
+<rect x="290" y="34" width="67" height="16" rx="4" fill="var(--muted)" opacity="0.4"></rect>
+<text x="363" y="46" font-size="11" fill="var(--muted)" font-family="ui-monospace, Menlo, Consolas, monospace">E2 3.50</text>
+<text x="0" y="82" font-size="11" fill="var(--muted)" font-family="ui-monospace, Menlo, Consolas, monospace">3.0 / 0.75 / 0.75</text>
+<rect x="150" y="70" width="171" height="16" rx="4" fill="var(--car)"></rect>
+<text x="327" y="82" font-size="11" fill="var(--car)" font-family="ui-monospace, Menlo, Consolas, monospace">E1 9.00</text>
+<rect x="420" y="70" width="200" height="16" rx="4" fill="var(--muted)" opacity="0.4"></rect>
+<text x="626" y="82" font-size="11" fill="var(--muted)" font-family="ui-monospace, Menlo, Consolas, monospace">E2 10.50</text>
+<text x="360" y="110" text-anchor="middle" font-size="11.5" fill="var(--accent)">Only the ratios carry information &mdash; so pinning W_WAIT at 1.0 costs nothing.</text>
+</svg></div>
+<ul class="ticks tight">
+  <li><code>W_WAIT</code> is pinned at 1.0 in every preset: the cost only <em>ranks</em> cars and is
+      never reported, so a common factor cancels.
+      <code>test_weights_reach_the_cost_function</code> pins exactly that.</li>
+  <li>Under <code>scan</code>, <strong>balanced / fair / selfish score identically</strong> (17.2 / 39.9)
+      across the whole fairness range &mdash; a consistency check, not a coincidence. A true-SCAN car
+      reverses at the building's end regardless, so <code>delta_imposed</code> is permanently 0 and
+      <code>W_FAIRNESS</code> has nothing to multiply.</li>
+</ul>
+</div>
+  <footer><span class="stamp">&sect;8</span><span class="count"></span></footer>
+</section>
+
+<section class="slide" data-track="core" data-section="9">
+  <header><p class="kicker">the sweep</p><h2>Which combination wins</h2></header>
+  <div class="body">
+<div class="two-col wide-left">
+<figure class="chart"><img src="../analysis/figures/scheduler_comparison_total_time.png" alt="Average total time for each scheduler and car policy pair"></figure>
+  <table class="data compact">
+    <thead><tr><th>pair</th><th>wait</th><th>total</th></tr></thead>
+    <tbody>
+      <tr class="win"><td>destination_dispatch + bounded_detour</td><td>14.4</td><td>34.3</td></tr>
+      <tr><td>destination_dispatch + look</td><td>14.9</td><td>34.9</td></tr>
+      <tr><td>destination_dispatch + scan</td><td>17.2</td><td>40.2</td></tr>
+      <tr><td>round_robin + bounded_detour</td><td>18.3</td><td>39.2</td></tr>
+      <tr><td>round_robin + look</td><td>19.0</td><td>39.8</td></tr>
+      <tr><td>round_robin + scan</td><td>19.2</td><td>42.8</td></tr>
+    </tbody>
+  </table>
+</div>
+<p class="callout">The <strong>scheduler</strong> matters more than the car policy &mdash; swapping
+<code>round_robin</code> for <code>destination_dispatch</code> buys more than any movement rule does.</p>
+</div>
+  <footer><span class="stamp">&sect;9</span><span class="count"></span></footer>
+</section>
+
+<section class="slide" data-track="core" data-section="9">
+  <header><p class="kicker">experiment design</p><h2>Why the grid is a full 2 &times; 3</h2></header>
+  <div class="body">
+<p class="lede">Not for completeness &mdash; so the two effects can be <strong>separated</strong>.</p>
+<div class="separation">
+  <div class="sep-card">
+    <h3>round_robin + look &rarr; round_robin + bounded_detour</h3>
+    <p>What the detour policy is worth <strong>on its own</strong>, under a dispatcher that knows
+       nothing.</p>
+    <p class="delta">19.0 &rarr; 18.3 wait</p>
+  </div>
+  <div class="sep-card">
+    <h3>destination_dispatch + look &rarr; + bounded_detour</h3>
+    <p>What the dispatcher gains specifically from <strong>knowing</strong> a car may detour: told the
+       car's bounds, it stops pricing a pickup behind a car as a full reversal.</p>
+    <p class="delta">14.9 &rarr; 14.4 wait</p>
+  </div>
+</div>
+<div class="pair curves">
+  <figure>
+    <img src="../analysis/figures/round_robin_look_avg_total_time.png"
+         alt="Average total time against elevator count for round_robin + look, one trace per capacity">
+    <figcaption>round_robin + look &mdash; the baseline, flattens near <b>29</b></figcaption>
+  </figure>
+  <figure>
+    <img src="../analysis/figures/destination_dispatch_bounded_detour_avg_total_time.png"
+         alt="Average total time against elevator count for destination_dispatch + bounded_detour, one trace per capacity">
+    <figcaption>destination_dispatch + bounded_detour &mdash; flattens near <b>25</b></figcaption>
+  </figure>
+</div>
+<p class="note">The same swap, across every fleet size and capacity: the gap holds at
+<strong>every</strong> resourcing level, and at capacity 8 or more the default reaches with
+<strong>4 cars</strong> what the baseline needs <strong>10</strong> to match.</p>
+</div>
+  <footer><span class="stamp">&sect;9</span><span class="count"></span></footer>
+</section>
+
+<section class="slide" data-track="core" data-section="10">
+  <header><p class="kicker">where it doesn't hold</p><h2>Trade-offs, honestly</h2></header>
+  <div class="body">
+<div class="trades">
+  <div class="trade">
+    <h3>The detour policy is not universally better</h3>
+    <p>On <code>sample_full_day</code> (4 cars, 35 floors) <code>+ look</code> gets <strong>4.3</strong>
+       avg wait / max 22; <code>+ bounded_detour</code> gets <strong>7.7</strong> / max 34 &mdash; the
+       reverse of the skyscraper result.</p>
+    <p class="why">Both runs are committed to <code>outputs/runs/</code> so the trade stays visible.</p>
+  </div>
+  <div class="trade">
+    <h3>The default weights buy wait and pay in ride time</h3>
+    <p>Strongest setting on <code>skyscraper50</code> (+0.97) and <code>stress</code> (+0.51);
+       <strong>third of five</strong> on <code>full_day</code> (&minus;0.42) and
+       <code>downpeak40</code> (&minus;0.99).</p>
+    <p class="why">It won the sweep-wide mean &mdash; a mean, not a guarantee.</p>
+  </div>
+  <div class="trade">
+    <h3>Fairness costs the mean and buys the tail</h3>
+    <p>Both the D/k/F bounds and <code>W_FAIRNESS</code> make the average slightly worse in some
+       scenarios and the worst case much better.</p>
+    <p class="why">The fairness-vs-efficiency trade, chosen deliberately.</p>
+  </div>
+  <div class="trade">
+    <h3>Capacity bites only at boarding</h3>
+    <p>A full car passes a waiting passenger. Capacity pressure therefore shows up as
+       <strong>wait</strong>, never as rejection.</p>
+    <p class="why">Which keeps "serve every request eventually" true.</p>
+  </div>
+</div>
+<p class="foot-note">None of these turned up while writing slides &mdash; they are why the losing
+runs are committed to the repo.</p>
+</div>
+  <footer><span class="stamp">&sect;10</span><span class="count"></span></footer>
+</section>
+
+<section class="slide" data-track="core" data-section="11">
+  <header><h2>What's next</h2></header>
+  <div class="body">
+<ol class="next">
+  <li><strong>Model door / boarding delay.</strong> The one change that costs
+      <code>trip_estimator</code> its exactness &mdash; every closed form becomes an approximation and
+      the scheduler's ETA stops being a promise. A deliberate next step, not an oversight.</li>
+  <li><strong>Wire in <code>express</code>.</strong> Implemented: cars opt in via
+      <code>serviceable_floors</code>, both ends of a trip must be covered, nearest eligible car wins,
+      and it fails fast rather than stranding a passenger. Not wired in because
+      <code>destination_dispatch</code> treats the fleet as homogeneous &mdash; the real work is teaching
+      the cost model eligibility, not exposing a flag.</li>
+  <li><strong>Adaptive weights.</strong> A scheduler that retuned to the traffic it is seeing would
+      beat any single fixed choice. &sect;10 is the evidence.</li>
+</ol>
+</div>
+  <footer><span class="stamp">&sect;11</span><span class="count"></span></footer>
+</section>
+</div></div>
+
+<div id="mode">core only</div>
+<div id="help"><kbd>&larr;</kbd><kbd>&rarr;</kbd> move &nbsp; <kbd>C</kbd> core-only &nbsp; <kbd>Ctrl</kbd>+<kbd>P</kbd> pdf</div>
+
+<script>
+(function () {
+  var all = Array.prototype.slice.call(document.querySelectorAll('.slide'));
+  var frame = document.getElementById('frame');
+  var badge = document.getElementById('mode');
+  var coreOnly = false;
+  var index = 0;
+
+  function deck() {
+    return coreOnly ? all.filter(function (s) { return s.dataset.track === 'core'; }) : all;
+  }
+
+  function show(i) {
+    var d = deck();
+    index = Math.max(0, Math.min(i, d.length - 1));
+    all.forEach(function (s) { s.classList.remove('active'); });
+    var slide = d[index];
+    if (!slide) { return; }
+    slide.classList.add('active');
+    var counter = slide.querySelector('.count');
+    if (counter) { counter.textContent = (index + 1) + ' / ' + d.length; }
+    try { location.hash = String(index + 1); } catch (e) {}
+  }
+
+  function fit() {
+    var scale = Math.min(window.innerWidth / 1280, window.innerHeight / 720);
+    frame.style.setProperty('--scale', scale);
+  }
+
+  function toggleCore() {
+    var current = deck()[index];
+    coreOnly = !coreOnly;
+    badge.classList.toggle('on', coreOnly);
+    // stay on the current slide where possible, else the nearest core one before it
+    var d = deck();
+    var at = d.indexOf(current);
+    if (at === -1) {
+      at = 0;
+      for (var i = all.indexOf(current); i >= 0; i--) {
+        var found = d.indexOf(all[i]);
+        if (found !== -1) { at = found; break; }
+      }
+    }
+    show(at);
+  }
+
+  document.addEventListener('keydown', function (e) {
+    if (e.ctrlKey || e.metaKey || e.altKey) { return; }
+    switch (e.key) {
+      case 'ArrowRight': case 'PageDown': case ' ': case 'Enter':
+        e.preventDefault(); show(index + 1); break;
+      case 'ArrowLeft': case 'PageUp': case 'Backspace':
+        e.preventDefault(); show(index - 1); break;
+      case 'Home': e.preventDefault(); show(0); break;
+      case 'End': e.preventDefault(); show(deck().length - 1); break;
+      case 'c': case 'C': e.preventDefault(); toggleCore(); break;
+    }
+  });
+
+  document.addEventListener('click', function (e) {
+    if (e.target.closest('a')) { return; }
+    show(index + (e.clientX < window.innerWidth * 0.25 ? -1 : 1));
+  });
+
+  window.addEventListener('resize', fit);
+  window.addEventListener('beforeprint', function () {
+    all.forEach(function (s) { s.classList.add('active'); });
+  });
+  window.addEventListener('afterprint', function () { show(index); });
+
+  fit();
+  var start = parseInt((location.hash || '').slice(1), 10);
+  show(isNaN(start) ? 0 : start - 1);
+})();
+</script>
+</body>
+</html>
