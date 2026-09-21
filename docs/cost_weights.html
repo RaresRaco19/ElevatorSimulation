@@ -92,6 +92,7 @@
     font-size: 0.82rem;
     margin-top: 8px;
   }
+  a { color: var(--accent); }
   footer {
     margin-top: 40px;
     color: var(--muted);
@@ -100,7 +101,6 @@
     padding-top: 14px;
   }
   .lede { margin: 0 0 30px; font-size: 1.02rem; }
-  a { color: var(--accent); }
   .mono-block {
     background: var(--mono-bg);
     border-radius: 6px;
@@ -152,7 +152,7 @@
   <section>
     <h2>The formula</h2>
     <div class="panel">
-      <svg viewBox="0 0 720 166" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Cost function: W_WAIT 1.0 times ticks to pickup, plus W_TRAVEL 0.5 times ride time, plus W_FAIRNESS 0.5 times the delay imposed on existing passengers">
+      <svg viewBox="0 0 720 166" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Cost function: W_WAIT 1.0 times ticks to pickup, plus W_TRAVEL 0.25 times ride time, plus W_FAIRNESS 0.25 times the delay imposed on existing passengers">
         <text x="0" y="13" font-size="11" fill="var(--muted)" font-family="ui-monospace, Menlo, Consolas, monospace">COST OF GIVING THIS REQUEST TO THIS CAR</text>
 
         <rect x="0" y="26" width="224" height="100" rx="9" fill="var(--car-soft)" stroke="var(--car)"></rect>
@@ -165,7 +165,7 @@
 
         <rect x="248" y="26" width="224" height="100" rx="9" fill="var(--car-soft)" stroke="var(--car)"></rect>
         <text x="360" y="46" text-anchor="middle" font-size="10.5" fill="var(--muted)" font-family="ui-monospace, Menlo, Consolas, monospace">W_TRAVEL</text>
-        <text x="360" y="72" text-anchor="middle" font-size="18" fill="var(--car)" font-weight="600" font-family="ui-monospace, Menlo, Consolas, monospace">&times; 0.5</text>
+        <text x="360" y="72" text-anchor="middle" font-size="18" fill="var(--car)" font-weight="600" font-family="ui-monospace, Menlo, Consolas, monospace">&times; 0.25</text>
         <text x="360" y="94" text-anchor="middle" font-size="11" fill="var(--text)" font-family="ui-monospace, Menlo, Consolas, monospace">ride time</text>
         <text x="360" y="114" text-anchor="middle" font-size="11" fill="var(--muted)">pickup &rarr; dropoff</text>
 
@@ -173,13 +173,13 @@
 
         <rect x="496" y="26" width="224" height="100" rx="9" fill="var(--accent-soft)" stroke="var(--accent)"></rect>
         <text x="608" y="46" text-anchor="middle" font-size="10.5" fill="var(--accent)" font-family="ui-monospace, Menlo, Consolas, monospace">W_FAIRNESS</text>
-        <text x="608" y="72" text-anchor="middle" font-size="18" fill="var(--accent)" font-weight="600" font-family="ui-monospace, Menlo, Consolas, monospace">&times; 0.5</text>
+        <text x="608" y="72" text-anchor="middle" font-size="18" fill="var(--accent)" font-weight="600" font-family="ui-monospace, Menlo, Consolas, monospace">&times; 0.25</text>
         <text x="608" y="94" text-anchor="middle" font-size="11" fill="var(--text)" font-family="ui-monospace, Menlo, Consolas, monospace">delay_imposed</text>
         <text x="608" y="114" text-anchor="middle" font-size="11" fill="var(--muted)">what everyone else pays</text>
 
         <text x="360" y="154" text-anchor="middle" font-size="11.5" fill="var(--accent)">Lowest total wins &mdash; and only the third term needs to know the destination.</text>
       </svg>
-      <p class="diagram-caption">Multipliers shown are the shipped defaults. They are module constants at the top of <code>destination_dispatch.py</code> and constructor arguments on the scheduler, so any run can be scored under any weighting without editing the file.</p>
+      <p class="diagram-caption">Multipliers shown are the shipped defaults, chosen from the sweep below. They are fixed constants at the top of <code>destination_dispatch.py</code>; they stay constructor arguments only so the sweep can vary them, and the CLI does not expose them.</p>
     </div>
   </section>
 
@@ -199,8 +199,8 @@
         <tbody>
           <tr>
             <td><code>default</code></td>
-            <td class="num">1.0</td><td class="num">0.5</td><td class="num">0.5</td>
-            <td>The shipped setting: waiting hurts twice as much as riding.</td>
+            <td class="num">1.0</td><td class="num em">0.25</td><td class="num em">0.25</td>
+            <td>The shipped setting, picked from the sweep: waiting outweighs everything else four to one.</td>
           </tr>
           <tr>
             <td><code>ride-heavy</code></td>
@@ -208,9 +208,9 @@
             <td>A tick riding is as bad as a tick waiting, and other passengers barely count.</td>
           </tr>
           <tr>
-            <td><code>wait-first</code></td>
-            <td class="num">1.0</td><td class="num em">0.25</td><td class="num em">0.25</td>
-            <td>Waiting dominates everything &mdash; minimise it at the cost of longer rides.</td>
+            <td><code>balanced</code></td>
+            <td class="num">1.0</td><td class="num em">0.5</td><td class="num em">0.5</td>
+            <td>What shipped before the sweep retuned the defaults &mdash; waiting hurts twice as much as riding.</td>
           </tr>
           <tr>
             <td><code>fair</code></td>
@@ -234,21 +234,21 @@
       <svg viewBox="0 0 720 118" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Scaling all three weights by the same factor scales the cost by that factor and cannot change which car ranks first">
         <text x="0" y="13" font-size="11" fill="var(--muted)" font-family="ui-monospace, Menlo, Consolas, monospace">SCALING EVERY WEIGHT CHANGES THE NUMBERS, NEVER THE RANKING</text>
 
-        <text x="0" y="46" font-size="11" fill="var(--muted)" font-family="ui-monospace, Menlo, Consolas, monospace">1.0 / 0.5 / 0.5</text>
-        <rect x="150" y="34" width="98" height="16" rx="4" fill="var(--car)"></rect>
-        <text x="256" y="46" font-size="11" fill="var(--car)" font-family="ui-monospace, Menlo, Consolas, monospace">E1 3.5</text>
-        <rect x="320" y="34" width="126" height="16" rx="4" fill="var(--muted)" opacity="0.4"></rect>
-        <text x="454" y="46" font-size="11" fill="var(--muted)" font-family="ui-monospace, Menlo, Consolas, monospace">E2 4.5</text>
+        <text x="0" y="46" font-size="11" fill="var(--muted)" font-family="ui-monospace, Menlo, Consolas, monospace">1.0 / 0.25 / 0.25</text>
+        <rect x="150" y="34" width="57" height="16" rx="4" fill="var(--car)"></rect>
+        <text x="213" y="46" font-size="11" fill="var(--car)" font-family="ui-monospace, Menlo, Consolas, monospace">E1 3.00</text>
+        <rect x="290" y="34" width="67" height="16" rx="4" fill="var(--muted)" opacity="0.4"></rect>
+        <text x="363" y="46" font-size="11" fill="var(--muted)" font-family="ui-monospace, Menlo, Consolas, monospace">E2 3.50</text>
 
-        <text x="0" y="82" font-size="11" fill="var(--muted)" font-family="ui-monospace, Menlo, Consolas, monospace">3.0 / 1.5 / 1.5</text>
-        <rect x="150" y="70" width="294" height="16" rx="4" fill="var(--car)"></rect>
-        <text x="452" y="82" font-size="11" fill="var(--car)" font-family="ui-monospace, Menlo, Consolas, monospace">E1 10.5</text>
-        <rect x="520" y="70" width="162" height="16" rx="4" fill="var(--muted)" opacity="0.4"></rect>
-        <text x="690" y="82" font-size="11" fill="var(--muted)" font-family="ui-monospace, Menlo, Consolas, monospace">13.5</text>
+        <text x="0" y="82" font-size="11" fill="var(--muted)" font-family="ui-monospace, Menlo, Consolas, monospace">3.0 / 0.75 / 0.75</text>
+        <rect x="150" y="70" width="171" height="16" rx="4" fill="var(--car)"></rect>
+        <text x="327" y="82" font-size="11" fill="var(--car)" font-family="ui-monospace, Menlo, Consolas, monospace">E1 9.00</text>
+        <rect x="420" y="70" width="200" height="16" rx="4" fill="var(--muted)" opacity="0.4"></rect>
+        <text x="626" y="82" font-size="11" fill="var(--muted)" font-family="ui-monospace, Menlo, Consolas, monospace">E2 10.50</text>
 
         <text x="360" y="110" text-anchor="middle" font-size="11.5" fill="var(--accent)">Only the ratios carry information &mdash; so pinning W_WAIT at 1.0 costs nothing.</text>
       </svg>
-      <p class="diagram-caption">The cost ranks candidate cars and is never reported to anyone, so a common factor cancels out. Pinning <code>W_WAIT</code> at 1.0 in every preset therefore loses no generality and makes the other two columns read directly as &ldquo;relative to waiting&rdquo;. <code>tests/test_schedulers.py</code>'s <code>test_weights_reach_the_cost_function</code> pins exactly that.</p>
+      <p class="diagram-caption">The same two cars as <a href="destination_dispatch.html">the worked example</a>, scored at the shipped weights and at three times the shipped weights: the bars grow, the winner does not move. The cost ranks candidate cars and is never reported to anyone, so a common factor cancels out. Pinning <code>W_WAIT</code> at 1.0 in every preset therefore loses no generality and makes the other two columns read directly as &ldquo;relative to waiting&rdquo;. <code>tests/test_schedulers.py</code>'s <code>test_weights_reach_the_cost_function</code> pins exactly that.</p>
     </div>
   </section>
 
@@ -271,17 +271,17 @@
         </thead>
         <tbody>
           <tr><td><code>default</code></td>
-            <td class="num group">17.2</td><td class="num">39.9</td>
-            <td class="num group">15.2</td><td class="num">34.9</td>
-            <td class="num group">14.5</td><td class="num">34.3</td></tr>
+            <td class="num group">17.2</td><td class="num">40.2</td>
+            <td class="num group best">14.9</td><td class="num">34.9</td>
+            <td class="num group best">14.4</td><td class="num best">34.3</td></tr>
           <tr><td><code>ride-heavy</code></td>
             <td class="num group">17.7</td><td class="num">39.8</td>
             <td class="num group">15.4</td><td class="num">35.1</td>
             <td class="num group">15.0</td><td class="num">34.6</td></tr>
-          <tr><td><code>wait-first</code></td>
-            <td class="num group">17.2</td><td class="num">40.2</td>
-            <td class="num group best">14.9</td><td class="num">34.9</td>
-            <td class="num group best">14.4</td><td class="num best">34.3</td></tr>
+          <tr><td><code>balanced</code></td>
+            <td class="num group">17.2</td><td class="num">39.9</td>
+            <td class="num group">15.2</td><td class="num">34.9</td>
+            <td class="num group">14.5</td><td class="num best">34.3</td></tr>
           <tr><td><code>fair</code></td>
             <td class="num group">17.2</td><td class="num">39.9</td>
             <td class="num group">15.2</td><td class="num best">34.8</td>
@@ -292,9 +292,10 @@
             <td class="num group">14.9</td><td class="num worst">35.3</td></tr>
         </tbody>
       </table>
-      <p class="diagram-caption">Average ticks over the whole sweep &mdash; 11 scenarios x 1&ndash;10 cars x capacities 3/5/8/13, 1320 runs per preset. Best in column marked, worst marked in red.</p>
+      <p class="diagram-caption">Average ticks over the whole sweep &mdash; 11 scenarios x 1&ndash;10 cars x capacities 3/5/8/13, 1320 runs per preset. Best in column marked, worst marked in red. <code>default</code> is the shipped setting, and this table is what chose it.</p>
     </div>
-    <p class="callout" style="margin-top:14px">Two things to read off it. <strong>Turning fairness off costs you</strong>: <code>selfish</code> is the worst weighting for both <code>look</code> and <code>bounded_detour</code>, so the term earns its place. And <strong>under <code>scan</code> the weights barely register</strong> &mdash; <code>fair</code> and <code>selfish</code> score <em>identically</em> (17.2 / 39.9) despite sitting at opposite ends of the fairness range. That is a consistency check rather than a coincidence: a true-SCAN car reverses at the building's end no matter what, so <code>delta_imposed</code> is permanently 0 and <code>W_FAIRNESS</code> has nothing to multiply.</p>
+    <p class="callout" style="margin-top:14px">Three things to read off it. <strong>Turning fairness off costs you</strong>: <code>selfish</code> is the worst weighting for both <code>look</code> and <code>bounded_detour</code>, so the term earns its place. <strong>Under <code>scan</code> the weights barely register</strong> &mdash; <code>balanced</code>, <code>fair</code> and <code>selfish</code> score <em>identically</em> (17.2 / 39.9) despite spanning the whole fairness range. That is a consistency check rather than a coincidence: a true-SCAN car reverses at the building's end no matter what, so <code>delta_imposed</code> is permanently 0 and <code>W_FAIRNESS</code> has nothing to multiply. And <strong>the margins are small</strong> &mdash; which scheduler you pick matters far more than how you weight it.</p>
+    <p class="callout" style="margin-top:12px"><strong>The average hides a real trade.</strong> <code>default</code> wins the sweep-wide mean but is not uniformly better. Per scenario, with <code>bounded_detour</code>, it is the strongest setting on <code>sample_full_day_skyscraper50</code> (+0.97 ticks on the next best) and <code>sample_stress</code> (+0.51), but only third of five on <code>sample_full_day</code> (&minus;0.42) and <code>sample_downpeak_highrise40</code> (&minus;0.99). Weighting ride time low buys a shorter wait and pays for it in time aboard. <code>outputs/runs/</code> keeps a curated run of each kind committed so both sides stay visible.</p>
   </section>
 
   <section>
@@ -302,12 +303,11 @@
     <div class="panel">
       <p class="mono-block">python analysis/scripts/run_sweep.py --weights<br />python analysis/scripts/compare_schedulers.py --weights</p>
       <p class="diagram-caption">The first writes <code>outputs/weights/manifest.json</code> (~6600 runs, about half a minute, stats only &mdash; no per-run folders). The second charts it as <code>analysis/figures/weight_comparison_wait_time.png</code> and <code>_total_time.png</code>, grouped by preset with one bar per car policy.</p>
-      <p class="mono-block">python -m elevator_sim.run_simulation --scheduler destination_dispatch --car-policy look \<br />&nbsp;&nbsp;&nbsp;&nbsp;--requests data/requests/sample_full_day.csv --elevators 4 --floors 35 --capacity 8 \<br />&nbsp;&nbsp;&nbsp;&nbsp;--w-travel 1.0 --w-fairness 0.2 --out outputs/dd_ride_heavy_full_day</p>
-      <p class="diagram-caption">To watch one weighting instead of averaging it: the <code>--w-*</code> flags produce an ordinary run folder that shows up in the <code>ui/</code> playback app, and the effective weights are recorded in its <code>config.json</code>. Omitted flags fall back to the module constants, so every command that doesn't mention them is unaffected.</p>
+      <p class="diagram-caption">To try a weighting other than the shipped one, edit the three constants in <code>destination_dispatch.py</code> and re-run. They are deliberately not CLI flags: they describe how the scheduler behaves rather than what one run did, the same reasoning that keeps <code>bounded_detour</code>'s D/k/F bounds out of the CLI. Whichever values are in force are recorded in every run's <code>config.json</code>.</p>
     </div>
   </section>
 
-  <footer>See <a href="destination_dispatch.html">docs/destination_dispatch.html</a> for what the three terms mean and a worked example of the fairness term deciding a request, <code>src/elevator_sim/schedulers/destination_dispatch.py</code> for the implementation, and <code>analysis/README.md</code> for the sweep.</footer>
+  <footer>See <a href="destination_dispatch.html">docs/destination_dispatch.html</a> for what the three terms mean and a worked example of the fairness term deciding a request, <code>src/elevator_sim/schedulers/destination_dispatch.py</code> for the implementation, and <code>analysis/README.md</code> for the sweep. Start at <a href="architecture.html">architecture.html</a> for how the two layers fit together.</footer>
 </main>
 </body>
 </html>

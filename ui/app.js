@@ -11,7 +11,7 @@
 // cascading dropdowns (scenario -> scheduler/car_policy -> elevators -> capacity) built
 // entirely from outputs/sweep/manifest.json (produced by analysis/scripts/run_sweep.py).
 
-const DEFAULT_RUN_DIR = "../outputs/runs/round_robin_scan_full_day";
+const DEFAULT_RUN_DIR = "../outputs/runs/destination_dispatch_bounded_detour_full_day_skyscraper50";
 const RUN_ROOTS = ["../outputs/", "../outputs/runs/"];
 const SWEEP_MANIFEST_URL = "../outputs/sweep/manifest.json";
 const TICK_MS = 300;

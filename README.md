@@ -8,6 +8,11 @@ time until every request is served.
 
 ## Project layout
 
+**Start with [`docs/architecture.html`](docs/architecture.html)** — a one-page visual
+tour of how the simulator is built: two pluggable layers (which elevator takes a
+request, and how that elevator then moves) over a fixed engine that owns everything
+else.
+
 - `src/elevator_sim/core/` — the simulation engine, data model, and I/O. See
   [`core/README.md`](src/elevator_sim/core/README.md).
 - `src/elevator_sim/schedulers/` — pluggable "which elevator handles this request"
@@ -57,29 +62,39 @@ The package isn't installed (no `pyproject.toml`/`setup.py`), so `src/` needs to
 
 ```
 PYTHONPATH=src python -m elevator_sim.run_simulation \
-    --scheduler round_robin --car-policy scan \
-    --requests data/requests/sample_basic.csv \
-    --elevators 3 --floors 60 --capacity 8 \
-    --out outputs/round_robin_scan_sample_basic
+    --requests data/requests/sample_full_day_skyscraper50.csv \
+    --elevators 6 --floors 50 --capacity 10 \
+    --out outputs/my_run
 ```
 
 On Windows PowerShell, set the env var separately instead of inline:
 
 ```
 $env:PYTHONPATH = "src"
-python -m elevator_sim.run_simulation --scheduler round_robin --car-policy scan --requests data/requests/sample_basic.csv --elevators 3 --floors 60 --capacity 8 --out outputs/round_robin_scan_sample_basic
+python -m elevator_sim.run_simulation --requests data/requests/sample_full_day_skyscraper50.csv --elevators 6 --floors 50 --capacity 10 --out outputs/my_run
+```
+
+No `--scheduler` or `--car-policy` there: they default to **`destination_dispatch` +
+`bounded_detour`**, the recommended configuration (see `analysis/README.md` for the
+sweep it was chosen from). Name a baseline explicitly to compare against it:
+
+```
+    --scheduler round_robin --car-policy scan
 ```
 
 Currently available flag values:
 
 | Flag | Choices | Notes |
 | --- | --- | --- |
-| `--scheduler` | `round_robin`, `destination_dispatch` | `express` is implemented but not wired in; `zone_based` is a stub |
-| `--car-policy` | `scan`, `look`, `bounded_detour` | `fcfs` exists as a stub file but isn't wired in yet |
+| `--scheduler` | `round_robin`, **`destination_dispatch`** (default) | `express` is implemented but not wired in; `zone_based` is a stub |
+| `--car-policy` | `scan`, `look`, **`bounded_detour`** (default) | `fcfs` exists as a stub file but isn't wired in yet |
 | `--requests` | path to a `time,id,source,dest` CSV | see `data/requests/` |
 | `--elevators`, `--floors`, `--capacity` | integers | building configuration |
 | `--out` | output directory | created if it doesn't exist |
-| `--w-wait`, `--w-travel`, `--w-fairness` | floats, optional | cost weights for `destination_dispatch`; omitted means that scheduler's own defaults, so existing commands are unaffected. Rejected for any other scheduler rather than silently ignored. |
+
+`destination_dispatch`'s cost weights are fixed constants chosen from the sweep, not
+flags — see [`docs/cost_weights.html`](docs/cost_weights.html) for what they are and
+`analysis/scripts/run_sweep.py --weights` for comparing alternatives.
 
 ### 3. Inspect the output
 
@@ -168,8 +183,8 @@ TODO
   constraints bite more realistically. This is the change that would cost
   `trip_estimator` its exactness, so it wants doing deliberately.
 - Write `tests/test_engine.py`, the one test file still a TODO comment.
-- Pick `destination_dispatch`'s cost weights from the evidence. The comparison now
-  exists (`run_sweep.py --weights` then `compare_schedulers.py --weights`, see
-  `analysis/README.md`); the shipped defaults are still the ones set by judgement, and
-  changing them is a deliberate decision to take with that chart in hand.
+- Adapt the cost weights to the traffic. `1.0 / 0.25 / 0.25` was chosen from the
+  sweep, but it is the strongest setting on some scenarios and mid-table on others
+  (see [`docs/cost_weights.html`](docs/cost_weights.html)) — a scheduler that retuned
+  itself to the pattern it was seeing would beat any single fixed choice.
 - Package the project properly (`pyproject.toml`) so `PYTHONPATH=src` isn't required.

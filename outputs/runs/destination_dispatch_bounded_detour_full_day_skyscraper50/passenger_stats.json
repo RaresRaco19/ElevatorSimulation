@@ -1,18 +1,18 @@
 {
-  "count": 44,
+  "count": 62,
   "wait_time": {
     "min": 0,
-    "max": 19,
-    "avg": 4.0227272727272725
+    "max": 28,
+    "avg": 4.870967741935484
   },
   "total_time": {
     "min": 2,
-    "max": 49,
-    "avg": 25.5
+    "max": 104,
+    "avg": 36.774193548387096
   },
   "estimate_drift": {
-    "max": 2,
-    "avg": 0.09090909090909091,
+    "max": 6,
+    "avg": 0.12903225806451613,
     "passengers_delayed_beyond_estimate": 2
   },
   "notes": []

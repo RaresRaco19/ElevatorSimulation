@@ -92,6 +92,7 @@
     font-size: 0.82rem;
     margin-top: 8px;
   }
+  a { color: var(--accent); }
   footer {
     margin-top: 40px;
     color: var(--muted);
@@ -100,7 +101,6 @@
     padding-top: 14px;
   }
   .lede { margin: 0 0 30px; font-size: 1.02rem; }
-  a { color: var(--accent); }
   .mono-block {
     background: var(--mono-bg);
     border-radius: 6px;
@@ -152,7 +152,7 @@
   <section>
     <h2>The cost</h2>
     <div class="panel">
-      <svg viewBox="0 0 720 166" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Cost function: W_WAIT 1.0 times ticks to pickup, plus W_TRAVEL 0.5 times ride time, plus W_FAIRNESS 0.5 times the delay imposed on existing passengers">
+      <svg viewBox="0 0 720 166" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Cost function: W_WAIT 1.0 times ticks to pickup, plus W_TRAVEL 0.25 times ride time, plus W_FAIRNESS 0.25 times the delay imposed on existing passengers">
         <text x="0" y="13" font-size="11" fill="var(--muted)" font-family="ui-monospace, Menlo, Consolas, monospace">COST OF GIVING THIS REQUEST TO THIS CAR</text>
 
         <rect x="0" y="26" width="224" height="100" rx="9" fill="var(--car-soft)" stroke="var(--car)"></rect>
@@ -165,7 +165,7 @@
 
         <rect x="248" y="26" width="224" height="100" rx="9" fill="var(--car-soft)" stroke="var(--car)"></rect>
         <text x="360" y="46" text-anchor="middle" font-size="10.5" fill="var(--muted)" font-family="ui-monospace, Menlo, Consolas, monospace">W_TRAVEL</text>
-        <text x="360" y="72" text-anchor="middle" font-size="18" fill="var(--car)" font-weight="600" font-family="ui-monospace, Menlo, Consolas, monospace">&times; 0.5</text>
+        <text x="360" y="72" text-anchor="middle" font-size="18" fill="var(--car)" font-weight="600" font-family="ui-monospace, Menlo, Consolas, monospace">&times; 0.25</text>
         <text x="360" y="94" text-anchor="middle" font-size="11" fill="var(--text)" font-family="ui-monospace, Menlo, Consolas, monospace">ride time</text>
         <text x="360" y="114" text-anchor="middle" font-size="11" fill="var(--muted)">pickup &rarr; dropoff</text>
 
@@ -173,60 +173,60 @@
 
         <rect x="496" y="26" width="224" height="100" rx="9" fill="var(--accent-soft)" stroke="var(--accent)"></rect>
         <text x="608" y="46" text-anchor="middle" font-size="10.5" fill="var(--accent)" font-family="ui-monospace, Menlo, Consolas, monospace">W_FAIRNESS</text>
-        <text x="608" y="72" text-anchor="middle" font-size="18" fill="var(--accent)" font-weight="600" font-family="ui-monospace, Menlo, Consolas, monospace">&times; 0.5</text>
+        <text x="608" y="72" text-anchor="middle" font-size="18" fill="var(--accent)" font-weight="600" font-family="ui-monospace, Menlo, Consolas, monospace">&times; 0.25</text>
         <text x="608" y="94" text-anchor="middle" font-size="11" fill="var(--text)" font-family="ui-monospace, Menlo, Consolas, monospace">delay_imposed</text>
         <text x="608" y="114" text-anchor="middle" font-size="11" fill="var(--muted)">what everyone else pays</text>
 
         <text x="360" y="154" text-anchor="middle" font-size="11.5" fill="var(--accent)">Lowest total wins &mdash; and only the third term needs to know the destination.</text>
       </svg>
-      <p class="diagram-caption">The three weights are module constants at the top of <code>destination_dispatch.py</code>. Waiting is weighted heaviest because standing at a floor with no information is worse than riding in a car you can see moving; fairness is weighted level with the new passenger's own ride, so the scheduler won't wreck a committed route to shave a tick off one trip.</p>
+      <p class="diagram-caption">Fixed constants at the top of <code>destination_dispatch.py</code>, chosen from the sweep rather than by judgement. Waiting is weighted heaviest because standing at a floor with no information is worse than riding in a car you can see moving. See <a href="cost_weights.html">cost_weights.html</a> for how these were settled and what they trade away.</p>
     </div>
   </section>
 
   <section>
     <h2>Setting the weights</h2>
     <div class="panel">
-      <svg viewBox="0 0 720 150" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="The same E1 versus E2 request scored under three fairness weights: at zero E2 wins, at the default 0.5 E1 wins, at 1.5 E1 wins by a wide margin">
-        <text x="0" y="13" font-size="11" fill="var(--muted)" font-family="ui-monospace, Menlo, Consolas, monospace">THE SAME REQUEST ABOVE, SCORED AT THREE VALUES OF W_FAIRNESS</text>
+      <svg viewBox="0 0 720 150" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="The same E1 versus E2 request scored under three fairness weights: at zero E2 wins, at the default 0.25 E1 wins, at 1.5 E1 wins by a wide margin">
+        <text x="0" y="13" font-size="11" fill="var(--muted)" font-family="ui-monospace, Menlo, Consolas, monospace">THE SAME REQUEST ABOVE, SCORED AT THREE VALUES OF W_FAIRNESS (W_TRAVEL FIXED AT 0.25)</text>
 
         <!-- W_FAIRNESS = 0 : the fairness term vanishes, nearest car wins -->
         <rect x="0" y="24" width="224" height="112" rx="9" fill="var(--panel)" stroke="var(--border)"></rect>
         <text x="112" y="44" text-anchor="middle" font-size="10.5" fill="var(--accent)" font-family="ui-monospace, Menlo, Consolas, monospace">W_FAIRNESS = 0</text>
         <text x="112" y="60" text-anchor="middle" font-size="11" fill="var(--muted)">ignores everyone else</text>
         <text x="14" y="83" font-size="11" fill="var(--muted)" font-family="ui-monospace, Menlo, Consolas, monospace">E1</text>
-        <rect x="40" y="72" width="54" height="14" rx="4" fill="var(--muted)" opacity="0.4"></rect>
-        <text x="100" y="83" font-size="11" fill="var(--muted)" font-family="ui-monospace, Menlo, Consolas, monospace">3.5</text>
+        <rect x="40" y="72" width="35" height="14" rx="4" fill="var(--muted)" opacity="0.4"></rect>
+        <text x="81" y="83" font-size="11" fill="var(--muted)" font-family="ui-monospace, Menlo, Consolas, monospace">3.00</text>
         <text x="14" y="105" font-size="11" fill="var(--muted)" font-family="ui-monospace, Menlo, Consolas, monospace">E2</text>
-        <rect x="40" y="94" width="38" height="14" rx="4" fill="var(--accent)"></rect>
-        <text x="84" y="105" font-size="11" fill="var(--accent)" font-family="ui-monospace, Menlo, Consolas, monospace">2.5</text>
+        <rect x="40" y="94" width="24" height="14" rx="4" fill="var(--accent)"></rect>
+        <text x="70" y="105" font-size="11" fill="var(--accent)" font-family="ui-monospace, Menlo, Consolas, monospace">2.00</text>
         <text x="112" y="127" text-anchor="middle" font-size="11" fill="var(--accent)">&rarr; E2, the nearer car</text>
 
         <!-- W_FAIRNESS = 0.5 : the shipped default -->
         <rect x="248" y="24" width="224" height="112" rx="9" fill="var(--accent-soft)" stroke="var(--accent)"></rect>
-        <text x="360" y="44" text-anchor="middle" font-size="10.5" fill="var(--accent)" font-family="ui-monospace, Menlo, Consolas, monospace">W_FAIRNESS = 0.5</text>
+        <text x="360" y="44" text-anchor="middle" font-size="10.5" fill="var(--accent)" font-family="ui-monospace, Menlo, Consolas, monospace">W_FAIRNESS = 0.25</text>
         <text x="360" y="60" text-anchor="middle" font-size="11" fill="var(--muted)">the shipped default</text>
         <text x="262" y="83" font-size="11" fill="var(--muted)" font-family="ui-monospace, Menlo, Consolas, monospace">E1</text>
-        <rect x="288" y="72" width="54" height="14" rx="4" fill="var(--accent)"></rect>
-        <text x="348" y="83" font-size="11" fill="var(--accent)" font-family="ui-monospace, Menlo, Consolas, monospace">3.5</text>
+        <rect x="288" y="72" width="35" height="14" rx="4" fill="var(--accent)"></rect>
+        <text x="329" y="83" font-size="11" fill="var(--accent)" font-family="ui-monospace, Menlo, Consolas, monospace">3.00</text>
         <text x="262" y="105" font-size="11" fill="var(--muted)" font-family="ui-monospace, Menlo, Consolas, monospace">E2</text>
-        <rect x="288" y="94" width="69" height="14" rx="4" fill="var(--muted)" opacity="0.4"></rect>
-        <text x="363" y="105" font-size="11" fill="var(--muted)" font-family="ui-monospace, Menlo, Consolas, monospace">4.5</text>
-        <text x="360" y="127" text-anchor="middle" font-size="11" fill="var(--accent)">&rarr; E1, by 1.0</text>
+        <rect x="288" y="94" width="41" height="14" rx="4" fill="var(--muted)" opacity="0.4"></rect>
+        <text x="335" y="105" font-size="11" fill="var(--muted)" font-family="ui-monospace, Menlo, Consolas, monospace">3.50</text>
+        <text x="360" y="127" text-anchor="middle" font-size="11" fill="var(--accent)">&rarr; E1, by 0.50</text>
 
         <!-- W_FAIRNESS = 1.5 : committed routes become near-untouchable -->
         <rect x="496" y="24" width="224" height="112" rx="9" fill="var(--panel)" stroke="var(--border)"></rect>
         <text x="608" y="44" text-anchor="middle" font-size="10.5" fill="var(--accent)" font-family="ui-monospace, Menlo, Consolas, monospace">W_FAIRNESS = 1.5</text>
         <text x="608" y="60" text-anchor="middle" font-size="11" fill="var(--muted)">guards committed routes</text>
         <text x="510" y="83" font-size="11" fill="var(--muted)" font-family="ui-monospace, Menlo, Consolas, monospace">E1</text>
-        <rect x="536" y="72" width="54" height="14" rx="4" fill="var(--accent)"></rect>
-        <text x="596" y="83" font-size="11" fill="var(--accent)" font-family="ui-monospace, Menlo, Consolas, monospace">3.5</text>
+        <rect x="536" y="72" width="35" height="14" rx="4" fill="var(--accent)"></rect>
+        <text x="577" y="83" font-size="11" fill="var(--accent)" font-family="ui-monospace, Menlo, Consolas, monospace">3.00</text>
         <text x="510" y="105" font-size="11" fill="var(--muted)" font-family="ui-monospace, Menlo, Consolas, monospace">E2</text>
         <rect x="536" y="94" width="130" height="14" rx="4" fill="var(--muted)" opacity="0.4"></rect>
-        <text x="672" y="105" font-size="11" fill="var(--muted)" font-family="ui-monospace, Menlo, Consolas, monospace">8.5</text>
-        <text x="608" y="127" text-anchor="middle" font-size="11" fill="var(--accent)">&rarr; E1, by 5.0</text>
+        <text x="672" y="105" font-size="11" fill="var(--muted)" font-family="ui-monospace, Menlo, Consolas, monospace">11.0</text>
+        <text x="608" y="127" text-anchor="middle" font-size="11" fill="var(--accent)">&rarr; E1, by 8.00</text>
       </svg>
       <p class="diagram-caption">Three rules of thumb. <strong>Only the ratios matter</strong> &mdash; the cost is used to rank cars, never reported, so doubling all three changes nothing. <strong><code>W_FAIRNESS</code> is the one that changes behaviour</strong>: at 0 the scheduler degenerates to nearest-car-with-a-real-ETA, and raising it trades a longer wait for the new passenger against protecting people already promised a car. <strong><code>W_TRAVEL</code> is the least useful knob</strong>, because ride time is mostly fixed by the building's geometry rather than by which car you pick &mdash; it is kept below <code>W_WAIT</code> so a short ride can never outvote a long wait.</p>
-      <p class="diagram-caption">These values are judgement, not a fit &mdash; so there is a sweep for settling it. <code>run_sweep.py --weights</code> scores five named presets against all three car policies over every scenario at 1&ndash;10 cars and four capacities, and <code>compare_schedulers.py --weights</code> charts them, so a weight that only helps one traffic pattern shows up as a wash. Single runs take <code>--w-wait</code> / <code>--w-travel</code> / <code>--w-fairness</code> if you want to watch one weighting play back in the UI. The exact presets and what each one scores are in <a href="cost_weights.html">cost_weights.html</a>.</p>
+      <p class="diagram-caption">These values are judgement, not a fit &mdash; so there is a sweep for settling it. <code>run_sweep.py --weights</code> scores five named presets against all three car policies over every scenario at 1&ndash;10 cars and four capacities, and <code>compare_schedulers.py --weights</code> charts them, so a weight that only helps one traffic pattern shows up as a wash. The shipped values came out of that sweep; they are fixed constants rather than CLI flags, because they describe how the scheduler behaves rather than what one run did. The exact presets, what each one scores, and what the shipped setting trades away are in <a href="cost_weights.html">cost_weights.html</a>.</p>
       <div class="callout" style="margin-top:12px">What that sweep says today: the weights move far less than the scheduler choice does. Turning fairness off is the clearest loss (<code>selfish</code> costs <code>look</code> about a tick of avg total time), and under <code>scan</code> the weights barely register at all &mdash; a car that always reverses at the building's end imposes nothing on anyone, so <code>delta_imposed</code> is permanently 0 and <code>W_FAIRNESS</code> has nothing to multiply.</div>
     </div>
   </section>
@@ -234,8 +234,8 @@
   <section>
     <h2>Why that third term decides it</h2>
     <div class="panel">
-      <svg viewBox="0 0 720 315" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Two candidate cars scored for one 5 to 8 request: E1's committed sweep already spans it, while E2 must extend its sweep and delay a passenger waiting behind it">
-        <text x="0" y="16" font-size="11" fill="var(--muted)" font-family="ui-monospace, Menlo, Consolas, monospace">ONE REQUEST &mdash; 5 &rarr; 8 &mdash; SCORED AGAINST TWO CARS (floor axis, not time)</text>
+      <svg viewBox="0 0 720 315" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Two candidate cars scored for one 5 to 9 request: E1's committed sweep already spans it, while E2 must extend its sweep and delay a passenger waiting behind it">
+        <text x="0" y="16" font-size="11" fill="var(--muted)" font-family="ui-monospace, Menlo, Consolas, monospace">ONE REQUEST &mdash; 5 &rarr; 9 &mdash; SCORED AGAINST TWO CARS (floor axis, not time)</text>
 
         <!-- floor gridlines, floors 1-10 at x = 120 + (f-1)*49 -->
         <g stroke="var(--border)">
@@ -273,9 +273,9 @@
           <text x="389" y="66" text-anchor="middle" font-size="11" fill="var(--car)">already sweeping 3 &rarr; 10</text>
           <circle cx="218" cy="82" r="5" fill="var(--car)"></circle>
 
-          <line x1="316" y1="112" x2="463" y2="112" stroke="var(--accent)" stroke-width="3"></line>
+          <line x1="316" y1="112" x2="512" y2="112" stroke="var(--accent)" stroke-width="3"></line>
           <circle cx="316" cy="112" r="4" fill="var(--accent)"></circle>
-          <circle cx="463" cy="112" r="4" fill="var(--accent)"></circle>
+          <circle cx="512" cy="112" r="4" fill="var(--accent)"></circle>
           <text x="389" y="130" text-anchor="middle" font-size="11" fill="var(--accent)">fits inside &mdash; costs nobody anything</text>
         </g>
 
@@ -293,23 +293,23 @@
           <text x="316" y="176" text-anchor="middle" font-size="11" fill="var(--car)">sweeping 4 &rarr; 6</text>
           <circle cx="267" cy="192" r="5" fill="var(--car)"></circle>
 
-          <rect x="365" y="184" width="98" height="16" rx="5" fill="var(--accent-soft)" stroke="var(--accent)" stroke-dasharray="4,3"></rect>
-          <text x="414" y="176" text-anchor="middle" font-size="11" fill="var(--accent)">dragged out to 8</text>
+          <rect x="365" y="184" width="147" height="16" rx="5" fill="var(--accent-soft)" stroke="var(--accent)" stroke-dasharray="4,3"></rect>
+          <text x="438" y="176" text-anchor="middle" font-size="11" fill="var(--accent)">dragged out to 9</text>
 
-          <line x1="316" y1="222" x2="463" y2="222" stroke="var(--accent)" stroke-width="3"></line>
+          <line x1="316" y1="222" x2="512" y2="222" stroke="var(--accent)" stroke-width="3"></line>
           <circle cx="316" cy="222" r="4" fill="var(--accent)"></circle>
-          <circle cx="463" cy="222" r="4" fill="var(--accent)"></circle>
-          <text x="389" y="240" text-anchor="middle" font-size="11" fill="var(--accent)">+2 floors &rarr; the passenger at 1 pays 2 &times; 2 = 4 ticks</text>
+          <circle cx="512" cy="222" r="4" fill="var(--accent)"></circle>
+          <text x="414" y="240" text-anchor="middle" font-size="11" fill="var(--accent)">+3 floors &rarr; the passenger at 1 pays 2 &times; 3 = 6 ticks</text>
         </g>
 
         <!-- ===== verdict ===== -->
         <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="11">
-          <text x="0" y="296" fill="var(--car)">E1: 2 + 0.5&times;3 + 0 = 3.5</text>
-          <text x="230" y="296" fill="var(--muted)">E2: 1 + 0.5&times;3 + 0.5&times;4 = 4.5</text>
+          <text x="0" y="296" fill="var(--car)">E1: 2 + 0.25&times;4 + 0 = 3.00</text>
+          <text x="250" y="296" fill="var(--muted)">E2: 1 + 0.25&times;4 + 0.25&times;6 = 3.50</text>
           <text x="500" y="296" fill="var(--accent)">&rarr; E1 wins, though E2 is nearer</text>
         </g>
       </svg>
-      <p class="diagram-caption">A nearest-car scheduler takes E2 &mdash; it is one floor from the pickup, E1 is two. But E2 only runs as far as 6, so carrying this passenger to 8 drags its reversal point out, and the passenger at floor 1 pays for those two floors twice.</p>
+      <p class="diagram-caption">A nearest-car scheduler takes E2 &mdash; it is one floor from the pickup, E1 is two. But E2 only runs as far as 6, so carrying this passenger to 9 drags its reversal point out three floors, and the passenger at floor 1 pays for every one of them twice.</p>
     </div>
   </section>
 
@@ -413,8 +413,8 @@
   <section>
     <h2>Measured</h2>
     <div class="panel">
-      <svg viewBox="0 0 720 180" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Bar chart: average wait falls from 13.3 to 4.9 ticks, max wait from 53 to 30, and estimate drift from 5.4 to 0.1">
-        <text x="0" y="13" font-size="11" fill="var(--muted)" font-family="ui-monospace, Menlo, Consolas, monospace">sample_full_day &middot; 4 cars &middot; capacity 8 &middot; look policy</text>
+      <svg viewBox="0 0 720 180" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Bar chart: average wait falls from 22.1 to 5.3 ticks, max wait from 81 to 28, and estimate drift from 9.6 to 0.2">
+        <text x="0" y="13" font-size="11" fill="var(--muted)" font-family="ui-monospace, Menlo, Consolas, monospace">sample_full_day_skyscraper50 &middot; 6 cars &middot; capacity 10 &middot; look policy</text>
         <rect x="440" y="5" width="10" height="10" rx="2" fill="var(--muted)" opacity="0.55"></rect>
         <text x="456" y="14" font-size="11" fill="var(--muted)">round_robin</text>
         <rect x="560" y="5" width="10" height="10" rx="2" fill="var(--car)"></rect>
@@ -428,26 +428,26 @@
 
         <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="11">
           <rect x="165" y="34" width="420" height="16" rx="4" fill="var(--muted)" opacity="0.4"></rect>
-          <text x="593" y="46" fill="var(--muted)">13.3</text>
-          <rect x="165" y="54" width="155" height="16" rx="4" fill="var(--car)"></rect>
-          <text x="328" y="66" fill="var(--car)">4.9</text>
+          <text x="593" y="46" fill="var(--muted)">22.1</text>
+          <rect x="165" y="54" width="101" height="16" rx="4" fill="var(--car)"></rect>
+          <text x="274" y="66" fill="var(--car)">5.3</text>
 
           <rect x="165" y="84" width="420" height="16" rx="4" fill="var(--muted)" opacity="0.4"></rect>
-          <text x="593" y="96" fill="var(--muted)">53</text>
-          <rect x="165" y="104" width="238" height="16" rx="4" fill="var(--car)"></rect>
-          <text x="411" y="116" fill="var(--car)">30</text>
+          <text x="593" y="96" fill="var(--muted)">81</text>
+          <rect x="165" y="104" width="145" height="16" rx="4" fill="var(--car)"></rect>
+          <text x="318" y="116" fill="var(--car)">28</text>
 
           <rect x="165" y="134" width="420" height="16" rx="4" fill="var(--muted)" opacity="0.4"></rect>
-          <text x="593" y="146" fill="var(--muted)">5.4</text>
-          <rect x="165" y="154" width="8" height="16" rx="3" fill="var(--accent)"></rect>
-          <text x="181" y="166" fill="var(--accent)">0.1</text>
+          <text x="593" y="146" fill="var(--muted)">9.6</text>
+          <rect x="165" y="154" width="9" height="16" rx="3" fill="var(--accent)"></rect>
+          <text x="182" y="166" fill="var(--accent)">0.2</text>
         </g>
       </svg>
-      <p class="diagram-caption">Ticks, same requests and same cars &mdash; only the scheduler differs. <code>estimate drift</code> is the gap between the wait a scheduler promised and the one it delivered: <code>round_robin</code> guesses floor distance, this one reports the arrival it computed. Compare <code>outputs/runs/round_robin_look_full_day/</code> against <code>outputs/runs/destination_dispatch_look_full_day/</code>.</p>
+      <p class="diagram-caption">Ticks on the project's biggest scenario, same requests and same cars &mdash; only the scheduler differs. <code>estimate drift</code> is the gap between the wait a scheduler promised and the one it delivered: <code>round_robin</code> guesses floor distance, this one reports the arrival it computed. Compare <code>outputs/runs/round_robin_look_full_day_skyscraper50/</code> against <code>outputs/runs/destination_dispatch_look_full_day_skyscraper50/</code>.</p>
     </div>
   </section>
 
-  <footer>See <code>src/elevator_sim/schedulers/destination_dispatch.py</code> and <code>src/elevator_sim/schedulers/README.md</code> for the implementation, and <code>src/elevator_sim/core/trip_estimator.py</code> for the arithmetic it is built on.</footer>
+  <footer>See <code>src/elevator_sim/schedulers/destination_dispatch.py</code> and <code>src/elevator_sim/schedulers/README.md</code> for the implementation, and <code>src/elevator_sim/core/trip_estimator.py</code> for the arithmetic it is built on. Start at <a href="architecture.html">architecture.html</a> for how the two layers fit together.</footer>
 </main>
 </body>
 </html>

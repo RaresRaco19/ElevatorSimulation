@@ -23,9 +23,9 @@ Charts generated from a full config sweep across every scenario in `data/request
 
   | preset | wait / travel / fairness | |
   | --- | --- | --- |
-  | `default` | 1.0 / 0.5 / 0.5 | whatever `destination_dispatch.py`'s constants say |
+  | `default` | 1.0 / 0.25 / 0.25 | whatever `destination_dispatch.py`'s constants say |
   | `ride-heavy` | 1.0 / 1.0 / 0.2 | ride time counts as much as waiting |
-  | `wait-first` | 1.0 / 0.25 / 0.25 | minimise waiting above all |
+  | `balanced` | 1.0 / 0.5 / 0.5 | what shipped before the sweep retuned the defaults |
   | `fair` | 1.0 / 0.5 / 1.5 | guard routes already promised to passengers |
   | `selfish` | 1.0 / 0.5 / 0.0 | fairness off — nearest-car-with-a-real-ETA |
 
@@ -35,7 +35,8 @@ Charts generated from a full config sweep across every scenario in `data/request
   Unlike the main sweep this writes **stats only**, no per-run output folders: the chart
   needs nothing else, the UI doesn't browse this directory, and 6600 five-file runs would
   cost ~100MB for nothing. To inspect one weighting as a real, playable run, use
-  `run_simulation.py`'s `--w-wait` / `--w-travel` / `--w-fairness` flags instead.
+  edit the constants in `destination_dispatch.py` and run it through
+  `run_simulation.py`, or construct the scheduler directly as this mode does.
 
   It writes to `outputs/weights/`, not `outputs/sweep/`, because each mode wipes its own
   output directory on every run — sharing one would make them delete each other.
@@ -106,21 +107,29 @@ Averaged across the entire sweep (`compare_schedulers.py` with no filter), in ti
 
 | scheduler + car policy | avg wait | avg total |
 | --- | --- | --- |
-| destination_dispatch + bounded_detour | 14.5 | 34.3 |
-| destination_dispatch + look | 15.2 | 34.9 |
-| destination_dispatch + scan | 17.2 | 39.9 |
+| destination_dispatch + bounded_detour | 14.4 | 34.3 |
+| destination_dispatch + look | 14.9 | 34.9 |
+| destination_dispatch + scan | 17.2 | 40.2 |
 | round_robin + bounded_detour | 18.3 | 39.2 |
 | round_robin + look | 19.0 | 39.8 |
 | round_robin + scan | 19.2 | 42.8 |
 
-And across the weight sweep (`compare_schedulers.py --weights`), the cost weights move
-things far less than the scheduler does — a useful negative result. Two things do stand
-out: `selfish` (fairness off) is the worst weighting for `look` and `bounded_detour`
-(total_time 36.0 / 35.3 against `default`'s 34.9 / 34.3), so the fairness term earns its
-place; and under `scan` the weights barely matter at all — `fair` and `selfish` score
-*identically* (39.9 / 17.2). That second one is a consistency check rather than a
-coincidence: under true SCAN a car reverses at the building's end no matter what, so
-`delta_imposed_on_existing` is always 0 and `W_FAIRNESS` has nothing to multiply.
+Across the weight sweep (`compare_schedulers.py --weights`) the weights move things far
+less than the scheduler choice does, but not by nothing — the shipped `default`
+(`1.0 / 0.25 / 0.25`) was picked from it, and leads on wait time with `bounded_detour`
+(14.4 against `balanced`'s 14.5, the setting that shipped before). Two further things
+stand out. `selfish` (fairness off) is the worst weighting for both `look` and
+`bounded_detour` (total_time 36.0 / 35.3 against `default`'s 34.9 / 34.3), so the
+fairness term earns its place. And under `scan` the weights barely matter at all —
+`balanced`, `fair` and `selfish` all score *identically* (17.2 / 39.9). That last one is
+a consistency check rather than a coincidence: under true SCAN a car reverses at the
+building's end no matter what, so `delta_imposed_on_existing` is always 0 and
+`W_FAIRNESS` has nothing to multiply.
+
+Note the averages hide a real trade. `default` wins the sweep-wide mean but is not
+uniformly best: it is the strongest setting on `sample_full_day_skyscraper50` and
+`sample_stress`, and mid-table on `sample_full_day`. `docs/cost_weights.html` spells
+that out.
 
 Two things to read off it. The scheduler matters more than the car policy — swapping
 `round_robin` for `destination_dispatch` buys more than any movement rule does. And the
@@ -130,4 +139,6 @@ while `destination_dispatch`+`look` versus `destination_dispatch`+`bounded_detou
 isolates what the dispatcher gains specifically from *knowing* a car can detour (see
 `schedulers/README.md`'s note on `bind_car_policy`). Averages also understate the detour
 policy, which mostly moves the tail rather than the mean — compare max wait on the
-curated `sample_full_day` runs in `outputs/runs/README.md`.
+curated runs in `outputs/runs/README.md`.
+
+The top row is the pair `run_simulation.py` now defaults to.

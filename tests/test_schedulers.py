@@ -313,8 +313,12 @@ class TestDestinationDispatchScheduler:
             _car("E2", 4, direction=Direction.UP, stops=(1, 6)),
         ]
 
+        # The destination matters here: at 5 -> 8 the two cars cost exactly the same and
+        # the winner is decided by fleet order alone, which would make this test pass
+        # without demonstrating anything. 5 -> 9 makes E2 extend further, so the
+        # fairness term genuinely decides it.
         chosen, _ = _dispatcher(LookPolicy()).assign(
-            Request(time=0, id="R1", source=5, dest=8), elevators, 0, FLOORS
+            Request(time=0, id="R1", source=5, dest=9), elevators, 0, FLOORS
         )
 
         assert chosen == "E1"
@@ -441,9 +445,9 @@ class TestDestinationDispatchScheduler:
     # -- cost weights ----------------------------------------------------------
     #
     # All three share the fixture from test_prefers_a_car_whose_sweep_already_covers_the
-    # _trip: E1 sweeps 3 -> 10 so the 5 -> 8 trip nests inside it (wait 2, ride 3, delay
+    # _trip: E1 sweeps 3 -> 10 so the 5 -> 9 trip nests inside it (wait 2, ride 4, delay
     # 0); E2 stands nearer at 4 but only sweeps to 6, so the trip drags its reversal out
-    # and the passenger waiting at floor 1 pays for it (wait 1, ride 3, delay 4). Which
+    # and the passenger waiting at floor 1 pays for it (wait 1, ride 4, delay 6). Which
     # car wins is therefore decided entirely by the weighting -- the same example
     # docs/destination_dispatch.html walks through.
 
@@ -454,7 +458,7 @@ class TestDestinationDispatchScheduler:
             _car("E2", 4, direction=Direction.UP, stops=(1, 6)),
         ]
 
-    REQUEST = Request(time=0, id="R1", source=5, dest=8)
+    REQUEST = Request(time=0, id="R1", source=5, dest=9)
 
     def test_weights_default_to_the_module_constants(self):
         scheduler = DestinationDispatchScheduler()

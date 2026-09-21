@@ -13,7 +13,7 @@
   "note": "car_policy=look",
   "weights": {
     "wait": 1.0,
-    "travel": 0.5,
-    "fairness": 0.5
+    "travel": 0.25,
+    "fairness": 0.25
   }
 }

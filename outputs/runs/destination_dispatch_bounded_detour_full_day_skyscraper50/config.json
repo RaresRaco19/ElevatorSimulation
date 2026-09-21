@@ -1,19 +1,21 @@
 {
   "scheduler": "destination_dispatch",
   "car_policy": "bounded_detour",
-  "floors": 35,
+  "floors": 50,
   "elevators": [
     "E1",
     "E2",
     "E3",
-    "E4"
+    "E4",
+    "E5",
+    "E6"
   ],
-  "capacity": 8,
-  "input_file": "data/requests/sample_full_day.csv",
+  "capacity": 10,
+  "input_file": "data/requests/sample_full_day_skyscraper50.csv",
   "note": "car_policy=bounded_detour",
   "weights": {
     "wait": 1.0,
-    "travel": 0.5,
-    "fairness": 0.5
+    "travel": 0.25,
+    "fairness": 0.25
   }
 }

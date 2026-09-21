@@ -47,19 +47,25 @@ from elevator_sim.core import trip_estimator as te
 from elevator_sim.core.models import Elevator, Request
 from .base import Scheduler
 
-# Default relative weights of the three cost terms. Waiting at a floor with no
-# information is worse than riding in a car that is visibly moving, so waiting is
-# weighted heaviest; delay imposed on people who were already promised a car is weighted
-# the same as the new passenger's own ride, so the scheduler won't wreck a committed
-# route to shave a tick off one trip.
+# Relative weights of the three cost terms, picked from the sweep rather than by
+# judgement: analysis/scripts/run_sweep.py --weights scores a table of presets across
+# every scenario and resourcing level, and compare_schedulers.py --weights charts them.
+# Waiting is weighted heaviest because standing at a floor with no information is worse
+# than riding in a car you can see moving.
 #
-# These are defaults, not fixed rules -- an instance can be built with any weighting, and
-# analysis/scripts/run_sweep.py --weights sweeps a table of presets so the settings can
-# be compared on evidence rather than argued about. Only the ratios matter: the cost
-# ranks candidate cars and is never reported, so scaling all three changes nothing.
+# The trade this particular setting makes is worth knowing before changing it. Weighting
+# ride time low optimises the wait a passenger actually feels, at the cost of a slightly
+# longer ride: against 1.0/0.5/0.5 on the showcase scenario it wins avg and max wait but
+# gives up about a tick of total time. It is also not uniformly better -- it is the
+# strongest setting on sample_full_day_skyscraper50 and sample_stress, and mid-table on
+# sample_full_day. See docs/cost_weights.html.
+#
+# Only the ratios matter: the cost ranks candidate cars and is never reported, so
+# scaling all three changes nothing. They stay constructor arguments (defaulting to
+# these) purely so the weight sweep can vary them; the CLI does not expose them.
 W_WAIT = 1.0
-W_TRAVEL = 0.5
-W_FAIRNESS = 0.5
+W_TRAVEL = 0.25
+W_FAIRNESS = 0.25
 
 
 class DestinationDispatchScheduler(Scheduler):

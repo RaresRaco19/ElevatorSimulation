@@ -1,0 +1,325 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Simulator Architecture</title>
+<style>
+  :root {
+    --bg: #fbfaf8;
+    --panel: #ffffff;
+    --border: #e3ded6;
+    --text: #2a2724;
+    --muted: #6b655d;
+    --accent: #b5622f;
+    --accent-soft: #f1e2d6;
+    --car: #5a7a8c;
+    --car-soft: #dfe9ed;
+    --mono-bg: #f3efe8;
+    color-scheme: light dark;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #1c1a18;
+      --panel: #26221f;
+      --border: #3a3530;
+      --text: #ece7e0;
+      --muted: #a89f93;
+      --accent: #e08a52;
+      --accent-soft: #3a2c22;
+      --car: #8fb4c7;
+      --car-soft: #26343b;
+      --mono-bg: #2c2825;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font: 15px/1.55 -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  }
+  main {
+    max-width: 760px;
+    margin: 0 auto;
+    padding: 40px 20px 64px;
+  }
+  h1 {
+    font-size: 1.55rem;
+    margin: 0 0 4px;
+    letter-spacing: -0.01em;
+  }
+  .tagline {
+    color: var(--muted);
+    margin: 0 0 32px;
+    font-size: 0.98rem;
+  }
+  h2 {
+    font-size: 0.78rem;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--accent);
+    margin: 0 0 12px;
+  }
+  section { margin-bottom: 34px; }
+  ul { margin: 0; padding-left: 1.1em; }
+  li { margin-bottom: 7px; }
+  li:last-child { margin-bottom: 0; }
+  code {
+    background: var(--mono-bg);
+    border-radius: 4px;
+    padding: 0.1em 0.35em;
+    font-size: 0.88em;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 18px 20px;
+  }
+  .callout {
+    background: var(--accent-soft);
+    border-radius: 10px;
+    padding: 14px 18px;
+    font-size: 0.94rem;
+  }
+  .callout code { background: rgba(0,0,0,0.08); }
+  @media (prefers-color-scheme: dark) { .callout code { background: rgba(255,255,255,0.1); } }
+  svg { width: 100%; height: auto; display: block; }
+  .diagram-caption {
+    color: var(--muted);
+    font-size: 0.82rem;
+    margin-top: 8px;
+  }
+  a { color: var(--accent); }
+  footer {
+    margin-top: 40px;
+    color: var(--muted);
+    font-size: 0.82rem;
+    border-top: 1px solid var(--border);
+    padding-top: 14px;
+  }
+  .lede { margin: 0 0 30px; font-size: 1.02rem; }
+  .mono-block {
+    background: var(--mono-bg);
+    border-radius: 6px;
+    padding: 10px 12px;
+    margin: 0 0 4px;
+    font-size: 0.82rem;
+    line-height: 1.7;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    overflow-x: auto;
+  }
+  .mono-block + .diagram-caption { margin-bottom: 18px; }
+  table.data {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.86rem;
+  }
+  table.data th, table.data td {
+    padding: 7px 10px;
+    border-bottom: 1px solid var(--border);
+    text-align: left;
+    vertical-align: top;
+  }
+  table.data thead th {
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--muted);
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  table.data thead th.sub { text-transform: none; letter-spacing: 0; }
+  table.data tbody tr:last-child td { border-bottom: 0; }
+  table.data .num { text-align: right; font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+  table.data th.num { text-align: right; }
+  table.data .group { border-left: 1px solid var(--border); }
+  table.data .em { color: var(--accent); font-weight: 600; }
+  table.data .best { color: var(--car); font-weight: 600; }
+  table.data .worst { color: var(--accent); font-weight: 600; }
+  table.data code { background: none; padding: 0; font-size: 0.95em; }
+</style>
+</head>
+<body>
+<main>
+  <h1>Simulator Architecture</h1>
+  <p class="tagline">Two pluggable layers over a fixed engine &mdash; <code>src/elevator_sim/</code></p>
+
+  <p class="lede">A request arrives. Two separate decisions follow, and the whole design turns on keeping them apart: <strong>which car takes it</strong>, and then <strong>how that car moves</strong>. Each is a swappable layer with one method; everything else belongs to the engine.</p>
+
+  <section>
+    <h2>Two layers, two questions</h2>
+    <div class="panel">
+      <svg viewBox="0 0 720 396" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="A request falls through the scheduler layer, which picks a car, then the car policy layer, which decides which way that car moves; the engine underneath owns boarding, capacity, timing and logging">
+        <defs>
+          <marker id="down" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" fill="var(--muted)"></path>
+          </marker>
+        </defs>
+
+        <!-- the incoming request -->
+        <rect x="248" y="0" width="224" height="30" rx="8" fill="var(--panel)" stroke="var(--border)"></rect>
+        <text x="360" y="20" text-anchor="middle" font-size="11.5" fill="var(--text)" font-family="ui-monospace, Menlo, Consolas, monospace">request &mdash; 5 &rarr; 9 at t=12</text>
+        <line x1="360" y1="30" x2="360" y2="52" stroke="var(--muted)" stroke-width="1.5" marker-end="url(#down)"></line>
+
+        <!-- ============ layer 1: which car? ============ -->
+        <rect x="0" y="56" width="720" height="120" rx="10" fill="var(--accent-soft)" stroke="var(--accent)"></rect>
+        <text x="18" y="78" font-size="11" fill="var(--accent)" font-family="ui-monospace, Menlo, Consolas, monospace">LAYER 1 &mdash; schedulers/</text>
+        <text x="18" y="101" font-size="15" fill="var(--text)" font-weight="600">Which elevator takes this request?</text>
+        <rect x="18" y="112" width="440" height="24" rx="5" fill="var(--panel)" stroke="var(--border)"></rect>
+        <text x="30" y="128" font-size="10.5" fill="var(--text)" font-family="ui-monospace, Menlo, Consolas, monospace">assign(request, elevators, t, floors) &rarr; (elevator_id, eta)</text>
+        <text x="18" y="156" font-size="11" fill="var(--muted)">Not its job: how that car then moves, or whether it has room.</text>
+        <text x="702" y="101" text-anchor="end" font-size="11" fill="var(--accent)" font-family="ui-monospace, Menlo, Consolas, monospace">round_robin</text>
+        <text x="702" y="120" text-anchor="end" font-size="11" fill="var(--accent)" font-family="ui-monospace, Menlo, Consolas, monospace">destination_dispatch</text>
+        <text x="702" y="156" text-anchor="end" font-size="10.5" fill="var(--muted)">2 implementations</text>
+
+        <line x1="360" y1="176" x2="360" y2="206" stroke="var(--muted)" stroke-width="1.5" marker-end="url(#down)"></line>
+        <text x="372" y="196" font-size="11" fill="var(--muted)">the chosen car gains a committed stop</text>
+
+        <!-- ============ layer 2: which way? ============ -->
+        <rect x="0" y="210" width="720" height="120" rx="10" fill="var(--car-soft)" stroke="var(--car)"></rect>
+        <text x="18" y="232" font-size="11" fill="var(--car)" font-family="ui-monospace, Menlo, Consolas, monospace">LAYER 2 &mdash; car_policies/</text>
+        <text x="18" y="255" font-size="15" fill="var(--text)" font-weight="600">Which way does that car move this tick?</text>
+        <rect x="18" y="266" width="440" height="24" rx="5" fill="var(--panel)" stroke="var(--border)"></rect>
+        <text x="30" y="282" font-size="10.5" fill="var(--text)" font-family="ui-monospace, Menlo, Consolas, monospace">next_direction(elevator, t, floors) &rarr; UP | DOWN | IDLE</text>
+        <text x="18" y="310" font-size="11" fill="var(--muted)">Not its job: which requests it was given, or whether it has room.</text>
+        <text x="702" y="248" text-anchor="end" font-size="11" fill="var(--car)" font-family="ui-monospace, Menlo, Consolas, monospace">scan</text>
+        <text x="702" y="267" text-anchor="end" font-size="11" fill="var(--car)" font-family="ui-monospace, Menlo, Consolas, monospace">look</text>
+        <text x="702" y="286" text-anchor="end" font-size="11" fill="var(--car)" font-family="ui-monospace, Menlo, Consolas, monospace">bounded_detour</text>
+        <text x="702" y="310" text-anchor="end" font-size="10.5" fill="var(--muted)">3 implementations</text>
+
+        <!-- ============ everything else ============ -->
+        <rect x="0" y="344" width="720" height="48" rx="10" fill="var(--panel)" stroke="var(--border)" stroke-dasharray="5,4"></rect>
+        <text x="18" y="365" font-size="11" fill="var(--muted)" font-family="ui-monospace, Menlo, Consolas, monospace">core/engine.py</text>
+        <text x="18" y="383" font-size="11.5" fill="var(--text)">Owns everything else: boarding, capacity, the clock, and the position log.</text>
+      </svg>
+      <p class="diagram-caption">The &ldquo;not its job&rdquo; lines are the load-bearing part. Everything that passes between the layers is that one committed stop &mdash; there is no richer handover. Because neither layer reaches into the other, any scheduler runs against any car policy, and a change to one cannot quietly alter the other.</p>
+    </div>
+  </section>
+
+  <section>
+    <h2>One tick, four steps</h2>
+    <div class="panel">
+      <svg viewBox="0 0 720 210" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="The four steps of one tick: release and assign calls the scheduler, board and drop off is the engine, log positions is the engine, move one floor calls the car policy">
+        <defs>
+          <marker id="next" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
+            <path d="M0,0 L10,5 L0,10 z" fill="var(--muted)"></path>
+          </marker>
+        </defs>
+        <text x="0" y="13" font-size="11" fill="var(--muted)" font-family="ui-monospace, Menlo, Consolas, monospace">EVERY TICK, IN THIS ORDER &mdash; core/engine.py run()</text>
+
+        <!-- step 1: scheduler -->
+        <rect x="0" y="28" width="164" height="86" rx="9" fill="var(--accent-soft)" stroke="var(--accent)"></rect>
+        <text x="82" y="50" text-anchor="middle" font-size="16" fill="var(--accent)" font-weight="600" font-family="ui-monospace, Menlo, Consolas, monospace">1</text>
+        <text x="82" y="71" text-anchor="middle" font-size="11.5" fill="var(--text)" font-weight="600">release &amp; assign</text>
+        <text x="82" y="90" text-anchor="middle" font-size="10.5" fill="var(--accent)" font-family="ui-monospace, Menlo, Consolas, monospace">&rarr; LAYER 1</text>
+        <text x="82" y="106" text-anchor="middle" font-size="10" fill="var(--muted)">one batch per tick</text>
+        <line x1="168" y1="71" x2="180" y2="71" stroke="var(--muted)" stroke-width="1.5" marker-end="url(#next)"></line>
+
+        <!-- step 2: engine -->
+        <rect x="185" y="28" width="164" height="86" rx="9" fill="var(--panel)" stroke="var(--border)"></rect>
+        <text x="267" y="50" text-anchor="middle" font-size="16" fill="var(--muted)" font-weight="600" font-family="ui-monospace, Menlo, Consolas, monospace">2</text>
+        <text x="267" y="71" text-anchor="middle" font-size="11.5" fill="var(--text)" font-weight="600">board &amp; drop off</text>
+        <text x="267" y="90" text-anchor="middle" font-size="10.5" fill="var(--muted)" font-family="ui-monospace, Menlo, Consolas, monospace">engine</text>
+        <text x="267" y="106" text-anchor="middle" font-size="10" fill="var(--accent)">capacity enforced here</text>
+        <line x1="353" y1="71" x2="365" y2="71" stroke="var(--muted)" stroke-width="1.5" marker-end="url(#next)"></line>
+
+        <!-- step 3: engine -->
+        <rect x="370" y="28" width="164" height="86" rx="9" fill="var(--panel)" stroke="var(--border)"></rect>
+        <text x="452" y="50" text-anchor="middle" font-size="16" fill="var(--muted)" font-weight="600" font-family="ui-monospace, Menlo, Consolas, monospace">3</text>
+        <text x="452" y="71" text-anchor="middle" font-size="11.5" fill="var(--text)" font-weight="600">log positions</text>
+        <text x="452" y="90" text-anchor="middle" font-size="10.5" fill="var(--muted)" font-family="ui-monospace, Menlo, Consolas, monospace">engine</text>
+        <text x="452" y="106" text-anchor="middle" font-size="10" fill="var(--muted)">one row per tick</text>
+        <line x1="538" y1="71" x2="550" y2="71" stroke="var(--muted)" stroke-width="1.5" marker-end="url(#next)"></line>
+
+        <!-- step 4: car policy -->
+        <rect x="556" y="28" width="164" height="86" rx="9" fill="var(--car-soft)" stroke="var(--car)"></rect>
+        <text x="638" y="50" text-anchor="middle" font-size="16" fill="var(--car)" font-weight="600" font-family="ui-monospace, Menlo, Consolas, monospace">4</text>
+        <text x="638" y="71" text-anchor="middle" font-size="11.5" fill="var(--text)" font-weight="600">move one floor</text>
+        <text x="638" y="90" text-anchor="middle" font-size="10.5" fill="var(--car)" font-family="ui-monospace, Menlo, Consolas, monospace">&rarr; LAYER 2</text>
+        <text x="638" y="106" text-anchor="middle" font-size="10" fill="var(--muted)">each car, every tick</text>
+
+        <!-- loop back -->
+        <path d="M638,118 L638,146 L82,146 L82,120" fill="none" stroke="var(--muted)" stroke-width="1.5" stroke-dasharray="4,4" marker-end="url(#next)"></path>
+        <text x="360" y="164" text-anchor="middle" font-size="11" fill="var(--muted)">repeat until every passenger has a dropoff time</text>
+
+        <text x="360" y="196" text-anchor="middle" font-size="11.5" fill="var(--accent)">The two coloured steps are the only places a pluggable layer is called.</text>
+      </svg>
+      <p class="diagram-caption">One tick is one floor of travel. Boarding is instantaneous, which is why a car's arrival time is pure geometry &mdash; the property <code>core/trip_estimator.py</code> is built on.</p>
+    </div>
+  </section>
+
+  <section>
+    <h2>What plugs in</h2>
+    <div class="panel">
+      <svg viewBox="0 0 720 196" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="A two by three grid of every scheduler and car policy combination, with destination dispatch plus bounded detour marked as the default">
+        <text x="0" y="13" font-size="11" fill="var(--muted)" font-family="ui-monospace, Menlo, Consolas, monospace">EVERY COMBINATION RUNS &mdash; 2 SCHEDULERS &times; 3 CAR POLICIES</text>
+
+        <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="11" fill="var(--car)">
+          <text x="300" y="44" text-anchor="middle">scan</text>
+          <text x="440" y="44" text-anchor="middle">look</text>
+          <text x="590" y="44" text-anchor="middle">bounded_detour</text>
+        </g>
+        <g font-family="ui-monospace, Menlo, Consolas, monospace" font-size="11" fill="var(--accent)" text-anchor="end">
+          <text x="212" y="80">round_robin</text>
+          <text x="212" y="140">destination_dispatch</text>
+        </g>
+
+        <!-- row 1 -->
+        <rect x="228" y="56" width="144" height="34" rx="7" fill="var(--panel)" stroke="var(--border)"></rect>
+        <rect x="380" y="56" width="144" height="34" rx="7" fill="var(--panel)" stroke="var(--border)"></rect>
+        <rect x="532" y="56" width="188" height="34" rx="7" fill="var(--panel)" stroke="var(--border)"></rect>
+        <!-- row 2 -->
+        <rect x="228" y="116" width="144" height="34" rx="7" fill="var(--panel)" stroke="var(--border)"></rect>
+        <rect x="380" y="116" width="144" height="34" rx="7" fill="var(--panel)" stroke="var(--border)"></rect>
+        <rect x="532" y="116" width="188" height="34" rx="7" fill="var(--accent-soft)" stroke="var(--accent)" stroke-width="2"></rect>
+        <text x="626" y="138" text-anchor="middle" font-size="11" fill="var(--accent)" font-family="ui-monospace, Menlo, Consolas, monospace">the default</text>
+
+        <text x="360" y="182" text-anchor="middle" font-size="11.5" fill="var(--muted)">Because the layers never reach into each other, all six are valid &mdash; and <tspan font-family="ui-monospace, Menlo, Consolas, monospace">analysis/</tspan> sweeps every one.</text>
+      </svg>
+      <p class="diagram-caption">Adding a seventh combination means adding one file and one registry entry in <code>run_simulation.py</code> &mdash; nothing in <code>core/</code> changes.</p>
+    </div>
+  </section>
+
+  <section>
+    <h2>The package</h2>
+    <div class="panel">
+      <svg viewBox="0 0 720 258" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Package map: core provides the substrate, schedulers and car policies hold the pluggable implementations, run_simulation wires them together">
+        <text x="0" y="13" font-size="11" fill="var(--muted)" font-family="ui-monospace, Menlo, Consolas, monospace">src/elevator_sim/ &mdash; 1,317 LINES IN ALL</text>
+
+        <!-- core -->
+        <rect x="0" y="26" width="720" height="86" rx="9" fill="var(--panel)" stroke="var(--border)"></rect>
+        <text x="16" y="47" font-size="11.5" fill="var(--text)" font-weight="600" font-family="ui-monospace, Menlo, Consolas, monospace">core/</text>
+        <text x="86" y="47" font-size="11" fill="var(--muted)">the substrate both layers build on &mdash; 580 lines</text>
+        <g font-size="10.5" font-family="ui-monospace, Menlo, Consolas, monospace">
+          <text x="16" y="70" fill="var(--text)">models.py</text><text x="120" y="70" fill="var(--muted)">the shared vocabulary: Request, Elevator, Passenger</text>
+          <text x="16" y="88" fill="var(--text)">engine.py</text><text x="120" y="88" fill="var(--muted)">the tick loop above, and nothing else</text>
+          <text x="16" y="106" fill="var(--text)">trip_estimator.py</text><text x="160" y="106" fill="var(--muted)">closed-form travel time &mdash; io.py and metrics.py sit here too</text>
+        </g>
+
+        <!-- the two layers -->
+        <rect x="0" y="126" width="352" height="74" rx="9" fill="var(--accent-soft)" stroke="var(--accent)"></rect>
+        <text x="16" y="147" font-size="11.5" fill="var(--text)" font-weight="600" font-family="ui-monospace, Menlo, Consolas, monospace">schedulers/</text>
+        <text x="16" y="167" font-size="10.5" fill="var(--muted)">base.py defines assign(); 3 files implement it</text>
+        <text x="16" y="187" font-size="10.5" fill="var(--accent)" font-family="ui-monospace, Menlo, Consolas, monospace">396 lines</text>
+
+        <rect x="368" y="126" width="352" height="74" rx="9" fill="var(--car-soft)" stroke="var(--car)"></rect>
+        <text x="384" y="147" font-size="11.5" fill="var(--text)" font-weight="600" font-family="ui-monospace, Menlo, Consolas, monospace">car_policies/</text>
+        <text x="384" y="167" font-size="10.5" fill="var(--muted)">base.py defines next_direction(); 3 files implement it</text>
+        <text x="384" y="187" font-size="10.5" fill="var(--car)" font-family="ui-monospace, Menlo, Consolas, monospace">247 lines</text>
+
+        <!-- the wiring -->
+        <rect x="0" y="214" width="720" height="40" rx="9" fill="var(--panel)" stroke="var(--border)"></rect>
+        <text x="16" y="239" font-size="11.5" fill="var(--text)" font-weight="600" font-family="ui-monospace, Menlo, Consolas, monospace">run_simulation.py</text>
+        <text x="180" y="239" font-size="11" fill="var(--muted)">picks one from each registry, hands both to Simulation &mdash; 94 lines</text>
+      </svg>
+      <p class="diagram-caption"><code>schedulers/</code> holds a fourth file, <code>express.py</code>, which is implemented but not yet wired into the CLI.</p>
+    </div>
+  </section>
+
+  <footer>Each algorithm has its own walkthrough: schedulers in <a href="round_robin.html">round_robin</a> and <a href="destination_dispatch.html">destination_dispatch</a> (with its <a href="cost_weights.html">cost weights</a>); car policies in <a href="scan.html">scan</a>, <a href="look.html">look</a> and <a href="bounded_detour.html">bounded_detour</a>.</footer>
+</main>
+</body>
+</html>

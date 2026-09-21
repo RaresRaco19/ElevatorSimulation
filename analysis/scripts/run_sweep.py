@@ -78,7 +78,7 @@ WEIGHTS_OUT_DIR = ROOT / "outputs" / "weights"
 WEIGHT_PRESETS = {
     "default": (dd.W_WAIT, dd.W_TRAVEL, dd.W_FAIRNESS),
     "ride-heavy": (1.0, 1.0, 0.2),
-    "wait-first": (1.0, 0.25, 0.25),
+    "balanced": (1.0, 0.5, 0.5),  # what shipped before the sweep retuned the defaults
     "fair": (1.0, 0.5, 1.5),
     "selfish": (1.0, 0.5, 0.0),  # fairness off -> nearest-car-with-a-real-ETA
 }

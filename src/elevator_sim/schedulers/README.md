@@ -65,13 +65,13 @@ signal (see `outputs/runs/README.md`'s `estimate_drift`).
     that produced. A batch of one reduces to plain "pick the cheapest car", which is
     exactly what `assign()` promises.
 
-  The three weights are constructor arguments defaulting to the module constants, so a
-  run can be scored under any weighting without editing the file — `run_simulation.py`'s
-  `--w-wait` / `--w-travel` / `--w-fairness` flags and
-  `analysis/scripts/run_sweep.py --weights` both use that. Only the ratios carry
-  information: the cost ranks candidate cars and is never reported, so scaling all three
-  changes nothing. See [`docs/cost_weights.html`](../../../docs/cost_weights.html) for
-  the exact presets, the formula, and how each scores across the sweep.
+  The three weights are fixed constants (`1.0 / 0.25 / 0.25`), chosen from the sweep
+  rather than by judgement. They remain constructor arguments defaulting to those
+  constants purely so `analysis/scripts/run_sweep.py --weights` can vary them; the CLI
+  does not expose them. Only the ratios carry information: the cost ranks candidate cars
+  and is never reported, so scaling all three changes nothing. See
+  [`docs/cost_weights.html`](../../../docs/cost_weights.html) for the exact values, the
+  formula, and how each preset scores across the sweep.
 
   Unlike `round_robin`, its `estimated_wait_time` is a real ETA rather than a distance
   guess, which is what finally makes `estimate_drift` (see `outputs/runs/README.md`)
